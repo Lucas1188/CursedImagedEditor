@@ -93,7 +93,6 @@ static void print_binary(int code,int len){
       printf("0");
     }
   }
-  printf(" ");
 }
 
 static void print_codes(huffcode* codes[],size_t sz){
@@ -101,8 +100,9 @@ static void print_codes(huffcode* codes[],size_t sz){
   for(i=0;i<sz;i++){
     if(codes[i]!=NULL){
       n = codes[i]->code;
-      printf("%d|%d| 0b ",codes[i]->c,codes[i]->codelen);
+      printf("[%d\t|%d\t|0b ",codes[i]->c,codes[i]->codelen);
       print_binary(n,codes[i]->codelen);
+      printf("]\n");
     }else{
       printf("NULL in stack [%d]\n",i);
     }
@@ -384,18 +384,20 @@ void count_literals(short symbol){
 
 void count_ldcodes(short length, short distance){
   huffmancoder* dlcodes= global_codingtable[1];
+  int dcode;
   long* r;
-  global_distancecodes[0][dlcodes->data_count++]=distance;
+  dcode = get_distance_code(distance);
+  global_distancecodes[0][dlcodes->data_count++]=dcode;
   /*printf("Put dsym: %d into idx: %d",distance, dlcodes->data_count-1);*/
-  r = &dlcodes->freq[distance]; 
+  r = &dlcodes->freq[dcode]; 
   if(*r==0){
     /*printf("\nDistance bucket %d\n",distance);*/
-    dlcodes->table[distance]=dlcodes->distinct;
-    global_nodes[1][dlcodes->distinct] = make_node(distance,0,LEAF);
+    dlcodes->table[dcode]=dlcodes->distinct;
+    global_nodes[1][dlcodes->distinct] = make_node(dcode,0,LEAF);
     dlcodes->distinct++;
   }
   (*r)++;    
-  global_nodes[1][dlcodes->table[distance]]->freq++;
+  global_nodes[1][dlcodes->table[dcode]]->freq++;
   count_literals(length+LCODEBASE);
 }
 
@@ -425,7 +427,7 @@ void create_table(huffmancoder* hobj,huffnode** nodes,int stack_sz,int limit_len
   insertion_sort_xxB((char**)hobj->codetable, HC_CLEN_OFFSET, HC_SYM_OFFSET, HC_CLEN_SIZE, HC_SYM_SIZE, stack_sz, 0);
   
   /*print_codes(hobj->codetable,hobj->distinct);*/
-  
+
   make_deflate_codes(hobj->codetable,hobj->distinct);
   radix_sort_xb((char**)hobj->codetable,HC_SYM_OFFSET,HC_SYM_SIZE*8,hobj->distinct,0);
   print_codes(hobj->codetable,hobj->distinct);
@@ -555,7 +557,7 @@ int main(int argv, char** argc){
   make_reverse_codes(&o_huffman);
   */
   create_table(&o_huffman,cnodes,HUFFMAN_ALPHABET_SZ,15);
-  create_table(&d_huffman,dnodes,29,5);
+  create_table(&d_huffman,dnodes,30,5);
   /*
   print_codes(o_huffman.revcodetable,o_huffman.distinct);
   */
@@ -639,9 +641,12 @@ int main(int argv, char** argc){
   /*Write Header*/
   printf("Header\n");
   int cl_n = dump_codelens(cl_codelens,&cl_huffman,nc);
+
   int HLIT = lit_n-LCODEBASE;
   int HDIST = d_n-1;
   int HCLEN = cl_n-4;
+
+  printf("HLIT:%d HDIST:%d HCLEN:%d\n",HLIT,HDIST,HCLEN);
   packbits(&bh,1,1);      /*BFINAL =1*/
   
   packbits(&bh,2,2);      /*BTYPE = 10*/
@@ -649,7 +654,6 @@ int main(int argv, char** argc){
   packbits(&bh,HDIST,5);  
   packbits(&bh,HCLEN,4);  
   
-
   printf("\n");
   char cl_lensbuffer [19]={0};
   for(i=0;i<cl_n;i++){
@@ -657,13 +661,9 @@ int main(int argv, char** argc){
       cl_lensbuffer[CODELEN_ORDER[cl_huffman.revcodetable[i]->c]] = cl_huffman.revcodetable[i]->code;
   }
   for(i=0;i<cl_n;i++){
-      packbits(&bh,cl_lensbuffer[i],3);
-      print_binary(cl_lensbuffer[i],3);
-  }
-  printf("\n");
-  
-  for(i=0;i<nc;i++){
-  
+  for(i=0;i<n;i++){
+    packbits(&bh,cl_lensbuffer[i],3);
+    print_binary(cl_lensbuffer[i],3);
   }
   
   free(ba.data);

@@ -101,7 +101,7 @@ int generate_lzss_pointers(char* input,int input_size,slzss_pointer* lzss_ptrs,i
     match_len = find_match(input, pos, maxlen, &dist);
     if(match_len >= MIN_MATCH){
       emit_pointer(&lzss_ptrs[ptr_count++], pos, match_len, dist);
-      /*printf("<%d,%d>",match_len,dist);*/
+      printf("<%d,%d>",match_len,dist);
       fn_olptr(match_len,dist);
       for(i=0;i<match_len;i++){
         insert_hash((const unsigned char*)input, pos+i);

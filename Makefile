@@ -8,6 +8,8 @@ OBJ := $(SRC:%.c=build/%.o) $(LIB:%.c=build/%.o)
 
 TARGET = cursed
 
+.PHONY: all clean force
+
 all: $(TARGET)
 
 $(TARGET): $(OBJ)
@@ -16,6 +18,8 @@ $(TARGET): $(OBJ)
 build/%.o: %.c
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c $< -o $@
+
+force: clean all
 
 clean:
 	rm -rf build $(TARGET)

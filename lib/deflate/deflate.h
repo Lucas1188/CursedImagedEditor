@@ -38,7 +38,7 @@ static const unsigned char DISTANCE_LENS[30]={
   11,   11,   12,   12,   13,   13
 };
 
-static int get_distance_lookupidx(short distance){
+static int get_distance_code(short distance){
   int lo = 0;
   int hi = 29;
   int mid;
