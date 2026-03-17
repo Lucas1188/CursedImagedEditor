@@ -159,7 +159,10 @@ static const unsigned char LENCODE_LOOKUP[259] = {
 };
 
 const unsigned char CODELEN_ORDER[19] = {
-  16, 17, 18, 0,  8,  7,  9,  6,  10, 5,  11, 4,  12, 3,  13, 2,  14, 1, 15
+  16, 17, 18, 0,  8,  7,  9,  6,  10, 5,  /*10*/11, 4,  12, 3,  13, 2,  14, 1, 15
+};
+const unsigned char CODELEN_IDX_ORDER[19] = {
+  3, 17, 15, 13,  11,  9,  7,  5,  4,   6,  /*10*/8,  10,  12, 14,  16,   18,  0,   1,  2
 };
 const unsigned char CODELEN_EBITS[19] = {
   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  2,  3, 7

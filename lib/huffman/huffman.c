@@ -22,12 +22,13 @@ struct huffnode* make_node(short c, int freq, enum HUFF_NODE_TYPE type){
   return hn;
 }
 
-struct huffcode* make_code(short c,unsigned char len, unsigned short code){
+struct huffcode* make_code(short c,unsigned char len, unsigned short code, unsigned int frequency){
   huffcode* hc;
   hc = malloc(sizeof(huffcode));
   hc->c = c;
   hc->codelen = len;
   hc->code = code;
+  hc->freq = frequency;
   return hc;
 }
 void free_huffnode(huffnode* node){
@@ -110,44 +111,43 @@ static void print_codes(huffcode* codes[],size_t sz){
 }
 
 huffnode* build_huffman_tree(huffnode* nodes[], int size){
-  int lidx,n,offset,c;
-  huffnode* l, * r,*p,movednodes[HUFFMAN_ALPHABET_SZ];
-  offset = HN_FREQ_OFFSET;
-  lidx = size-1;
-  n = size;
-  if(n == 1){
-    huffnode *only = nodes[0];
-    huffnode *dummy;
+    int n = size;
+    huffnode *l, *r, *p;
+    huffnode* dummy;
 
-    printf("Makesingle %ld %d\n", only->freq, only->c);
+    if(n == 1){
+        huffnode *only = nodes[0];
+        printf("Makesingle %ld %d\n", only->freq, only->c);
 
-    /* create a dummy leaf to form a valid tree */
-    dummy = make_p_node(0, 0, NULL, NULL, LEAF);
-    dummy->c = only->c;   /* value won't be used */
+        dummy = make_p_node(0, 0, NULL, NULL, LEAF);
+        dummy->c = (only->c == 0 ? 1 : 0); /* dummy value */
 
-    /* create root with two children */
-    nodes[0] = make_p_node(0, only->freq, only, dummy, ROOT);
-
-    return nodes[0];
-  }
-  radix_sort_xb((char**)nodes,offset,sizeof(long)*8,n,1);
-  while(n>1){
-    /*print_nodes(nodes,n);*/
-    l = nodes[n-1];
-    r = nodes[n-2];
-    nodes[n-2] = make_p_node(0,l->freq+r->freq,l,r,PARENT);
-    nodes[n-1] = (huffnode*)NULL;
-    n--;
-    c = n - 1;
-    while (c > 0 && nodes[c]->freq > nodes[c-1]->freq) {
-      p = nodes[c-1];
-      nodes[c-1] = nodes[c];
-      nodes[c] = p;
-      c--;
+        nodes[0] = make_p_node(0, only->freq, only, dummy, ROOT);
+        return nodes[0];
     }
-  }
-  nodes[0]->ntype=ROOT;
-  return nodes[0];
+
+    radix_sort_xb((char**)nodes, HN_FREQ_OFFSET, sizeof(long)*8, n, 0);
+
+    while(n > 1){
+        int i;
+        print_nodes(nodes, n);
+
+        l = nodes[0];
+        r = nodes[1];
+        p = make_p_node(0, l->freq + r->freq, l, r, PARENT);
+
+        for(i = 2; i < n; i++) nodes[i-2] = nodes[i];
+        n -= 2;
+
+        for(i = n-1; i >= 0 && nodes[i]->freq > p->freq; i--){
+            nodes[i+1] = nodes[i];
+        }
+        nodes[i+1] = p;
+        n++;
+    }
+
+    nodes[0]->ntype = ROOT;
+    return nodes[0];
 }
 
 void make_reverse_codes(huffmancoder* obj){
@@ -232,14 +232,14 @@ void rebuild_huffman_tree(huffmancoder* hobj, short* code_lens)
 }
 
 void generate_codes(huffnode* cnode,huffcode** code_list,unsigned char clen,unsigned short ccode){
-  unsigned char n0code, n1code;
+  unsigned short n0code, n1code;
   huffcode* hc;
 
   if(cnode==NULL){
     return;
   }
   if(cnode->ntype==LEAF){
-    code_list[cnode->c] = make_code(cnode->c,clen,ccode);
+    code_list[cnode->c] = make_code(cnode->c,clen,ccode,cnode->freq);
     return;
   }
   n0code = (ccode<<1)|0;
@@ -249,75 +249,110 @@ void generate_codes(huffnode* cnode,huffcode** code_list,unsigned char clen,unsi
   generate_codes(cnode->node1,code_list,clen,n1code); 
 }
 
-void limit_code_length(huffcode** code_list, size_t sz,size_t maxbits){
-  int i,k,maxk;
-  k=0;
-  /*
-  printf("Limiting code lengths to %ld\n",maxbits);
-  */
-  maxk = (1 << maxbits) - 1;
-  for(i=0;i<sz;i++){
-    if(code_list[i]->codelen>maxbits){
-  /*
-      printf("Truncate code idx:%d\n",i);
-  */
-      code_list[i]->codelen = maxbits;
+#define MAX_CODELEN 64  /* safe upper bound*/
+
+void limit_code_length(huffcode** code_list, size_t n, size_t maxbits)
+{
+    size_t i;
+
+    int bl_count[MAX_CODELEN] = {0};
+
+    /* -----------------------------
+       Step 1: build FULL histogram
+       (no clamping!)
+       ----------------------------- */
+    for (i = 0; i < n; i++) {
+        int len = code_list[i]->codelen;
+        if (len >= MAX_CODELEN) len = MAX_CODELEN - 1;
+        bl_count[len]++;
     }
-    k+= 1<<(maxbits-code_list[i]->codelen);
-  }
-  for(i=sz-1;i>0;i--){
-    while(code_list[i]->codelen<maxbits){
-      ++code_list[i]->codelen;
-      k-= 1<<(maxbits-code_list[i]->codelen);
-      /*
-      printf("Back k:%d %d\n",k,i);
-      */
-    } 
-  }
-  for(i=0;i<sz;i++){
-    while(k+(1<<(maxbits-code_list[i]->codelen))<=maxk){
-      k+=1<<(maxbits-code_list[i]->codelen);
-      --code_list[i]->codelen;
-      /*
-      printf("Forward k:%d %d\n",k,i);
-      */
+
+    /* -----------------------------
+       Step 2: count overflow
+       ----------------------------- */
+    int overflow = 0;
+    for (i = maxbits + 1; i < MAX_CODELEN; i++) {
+        overflow += bl_count[i];
     }
-  }
+
+    /* -----------------------------
+       Step 3: move overflow into maxbits
+       ----------------------------- */
+    bl_count[maxbits] += overflow;
+
+    /* -----------------------------
+       Step 4: redistribute
+       ----------------------------- */
+    while (overflow > 0) {
+        int bits = maxbits - 1;
+
+        /* find largest available shorter length */
+        while (bits > 0 && bl_count[bits] == 0)
+            bits--;
+
+        /* split one node */
+        bl_count[bits]--;
+        bl_count[bits + 1] += 2;
+
+        overflow--;
+    }
+
+    /* -----------------------------
+       Step 5: zero out invalid buckets
+       ----------------------------- */
+    for (i = maxbits + 1; i < MAX_CODELEN; i++) {
+        bl_count[i] = 0;
+    }
+
+    /* -----------------------------
+       Step 6: write back lengths
+       (IMPORTANT: relies on sorted order)
+       ----------------------------- */
+    size_t idx = 0;
+    int len;
+    for (len = 1; len <= (int)maxbits; len++) {
+        int count = bl_count[len];
+        while (count-- > 0) {
+            code_list[idx++]->codelen = len;
+        }
+    }
 }
 
-void make_deflate_codes(huffcode** code_list, size_t sz)
-{
-  int i, cl;
-  int code = 0;
-  int bits;
-  int bl_count[16];
-  int next_code[16];
-  printf("making deflate codes of array sz: %ld\n",sz);
-  memset(bl_count, 0, sizeof(bl_count));
-  memset(next_code, 0, sizeof(next_code));
 
-  /* count code lengths */
-  for(i=0;i<sz;i++){
-    if(code_list[i]->codelen > 0){
-      bl_count[code_list[i]->codelen]++;
+void make_deflate_codes(huffcode **table, size_t max_code, int maxbits) {
+    int bl_count[16] = {0};     
+    int next_code[16] = {0};    
+    int code, bits, n, len;
+
+    /*Step 1: count codes per code length*/
+    for (n = 0; n < max_code; n++) {
+        len = table[n]->codelen;
+        if (len > 0 && len <= maxbits) {
+            bl_count[len]++;
+        }
     }
-  }
 
-  /* compute canonical start codes */
-  for(bits = 1; bits <= 15; bits++){
-    code = (code + bl_count[bits-1]) << 1;
-    next_code[bits] = code;
-  }
-
-  /* assign codes */
-  for(i=0;i<sz;i++){
-    cl = code_list[i]->codelen;
-
-    if(cl != 0){
-      code_list[i]->code = next_code[cl];
-      next_code[cl]++;
+    /*Step 2: compute starting code for each length*/
+    code = 0;
+    bl_count[0] = 0;  
+    for (bits = 1; bits <= maxbits; bits++) {
+        code = (code + bl_count[bits - 1]) << 1;
+        next_code[bits] = code;
+        /*Optional debug
+         printf("length %d starts at code 0x%x\n", bits, code);*/
     }
-  }
+
+    /* Step 3: assign codes to symbols*/
+    for (n = 0; n < max_code; n++) {
+        len = table[n]->codelen;
+        if (len != 0) {
+            table[n]->code = next_code[len];
+            next_code[len]++;
+            /* Optional debug
+             printf("sym %d len %d code 0x%x\n", n, len, table[n]->code);
+             */
+        }
+    }
 }
 
 void decode_bitstream(huffmancoder* hobj, unsigned char* data, size_t size, fdecode_symbol_fn fdsym)
@@ -414,25 +449,44 @@ void count_clcodes(short symbol){
 }
 
 void create_table(huffmancoder* hobj,huffnode** nodes,int stack_sz,int limit_len){
-  /*printf("\nCreating Table with distinct: %d\n",hobj->distinct);*/
+  int i;
+  printf("\nCreating Table with distinct: %d\n\n",hobj->distinct);
+  if(hobj->distinct == 0){
+    printf("No symbols to encode\n");
+    return;
+  }
   hobj->root = build_huffman_tree(nodes,hobj->distinct);
-  
+  printf("Gen Codes:");
   generate_codes(hobj->root,hobj->codetable,0,0);
-  /*printf("Generated huffman\n");*/
-  insertion_sort_xxB((char**)hobj->codetable, HC_CLEN_OFFSET, HC_SYM_OFFSET, HC_CLEN_SIZE, HC_SYM_SIZE, stack_sz, 0);
-  /*
-  print_codes(hobj->codetable,hobj->distinct);
-  */
-  limit_code_length(hobj->codetable,hobj->distinct,limit_len);
-  insertion_sort_xxB((char**)hobj->codetable, HC_CLEN_OFFSET, HC_SYM_OFFSET, HC_CLEN_SIZE, HC_SYM_SIZE, stack_sz, 0);
-  
-  /*print_codes(hobj->codetable,hobj->distinct);*/
 
-  make_deflate_codes(hobj->codetable,hobj->distinct);
+  printf(" Ok\n\nSort (Length|Symbol) ASC:\n");
+  /*radix_sort_xb((char**)dense,HC_FREQ_OFFSET,HC_FREQ_SIZE*8,hobj->distinct,0);
+  
+  for (i = 0; i < HUFFMAN_ALPHABET_SZ; i++) {
+    if (i<hobj->distinct) {
+      hobj->codetable[i] = dense[i];
+    }else{
+      hobj->codetable[i] = NULL;
+    }
+  }
+  */
+  insertion_sort_xxB((char**)hobj->codetable, HC_CLEN_OFFSET, HC_SYM_OFFSET, HC_CLEN_SIZE, HC_SYM_SIZE, HUFFMAN_ALPHABET_SZ, 0);
+  
+  print_codes(hobj->codetable,hobj->distinct);
+  
+  printf(" Ok\nLimit Length:\n");
+  limit_code_length(hobj->codetable,hobj->distinct,limit_len);
+  
+  insertion_sort_xxB((char**)hobj->codetable, HC_CLEN_OFFSET, HC_SYM_OFFSET, HC_CLEN_SIZE, HC_SYM_SIZE, HUFFMAN_ALPHABET_SZ, 0);
+  
+  print_codes(hobj->codetable,hobj->distinct);
+  printf(" Ok\n\nMake deflate codes:\n\n");
+  
+  make_deflate_codes(hobj->codetable,hobj->distinct,limit_len);
   radix_sort_xb((char**)hobj->codetable,HC_SYM_OFFSET,HC_SYM_SIZE*8,hobj->distinct,0);
   print_codes(hobj->codetable,hobj->distinct);
   make_reverse_codes(hobj);
-  /*printf("\nDone Creating Table\n");*/
+  printf("\nDone Creating Table\n");
 }
 
 int dump_codelens(unsigned short* buffer,const huffmancoder* hobj,const int stack_sz){
@@ -469,38 +523,18 @@ int main(int argv, char** argc){
   init_s_huffmancode(&i_huffman);
   
   i=0;
-  input0[4181] = '\0';
-  input0[4180] = '|';
+  input0[4180] = '\0';
   _t_make_test_string(input0);
   input = input0;/*argc[1];*/
   input = argc[1];
   ptr_count = 0;
   /*LZSS*/
-  input_size = 19;
+  input_size = argv==3?strtol(argc[2], NULL, 10):4179;
   
   for(i=0;i<WINDOW_SIZE;i++) head[i] = -1;
   for(i=0;i<WINDOW_SIZE;i++) prev[i] = -1;
-  printf("LZSS portion\n");
-  /*
-  for(pos = 0; pos < input_size - MIN_MATCH; pos++)
-  {
-    dist = 0;
-    int remaining = input_size - pos;
-    int maxlen = remaining < LOOKAHEAD_SIZE ? remaining : LOOKAHEAD_SIZE;
-    match_len = find_match(input, pos, maxlen, &dist);
-    if(match_len >= MIN_MATCH)
-    {
-      emit_pointer(&lzss_ptrs[ptr_count++], pos, match_len, dist);
-      for(i=0;i<match_len;i++){
-        insert_hash(input, pos+i);
-      }
-      pos += match_len - 1;
-    }
-    else
-    {
-      insert_hash(input, pos);
-    }
-  }*/
+  printf("LZSS portion inputsize: %d\n",input_size);
+  
   global_codingtable[0] = &o_huffman;  
   global_codingtable[1] = &d_huffman;
   global_codingtable[2] = &cl_huffman;
@@ -514,56 +548,17 @@ int main(int argv, char** argc){
   ptr_count = generate_lzss_pointers(input,input_size,lzss_ptrs,WINDOW_SIZE,&pos,count_ldcodes,count_literals);
   count_literals(EOBCODE);
   
-  printf("Total ptrs: %d ->%d\n",ptr_count,pos);
-  /*
-  i=0;
-  while(input[i]!='\0'&&o_huffman.distinct<HUFFMAN_ALPHABET_SZ){
+  printf("\nTotal ptrs: %d ->%d\n",ptr_count,pos);
   
-    printf("CInput: %c\n",input[i]);
-  
-    r = &o_huffman.freq[input[i]]; 
-    if(*r==0){
-      o_huffman.table[input[i]]=o_huffman.distinct;
-      cnodes[o_huffman.distinct] = make_node(input[i],0,LEAF);
-  
-      printf("Put %c into track slot: %d\n",input[i],o_huffman.distinct);
-  
-      o_huffman.distinct++;
-    }
-    (*r)++;    
-    cnodes[o_huffman.table[input[i]]]->freq++;
-    i++;
-  }
-  */
   
   printf("Parsed %d %d symbols\n",pos,o_huffman.distinct);
-  /*
-  offset = (char*)&hn.freq-(char*)&hn;
   
-  o_huffman.root = build_huffman_tree(cnodes,o_huffman.distinct);
-  
-  generate_codes(o_huffman.root,o_huffman.codetable,0,0);
-  
-  offset = (char*)&hc.codelen - (char*)&hc;
-  offset1 = (char*)&hc.c - (char*)&hc;
-  insertion_sort_xxB((char**)o_huffman.codetable, offset, offset1, sizeof(hc.codelen), sizeof(hc.c), HUFFMAN_ALPHABET_SZ, 0);
-  print_codes(o_huffman.codetable,o_huffman.distinct);
-  limit_code_length(o_huffman.codetable,o_huffman.distinct,15);
-  insertion_sort_xxB((char**)o_huffman.codetable, offset, offset1, sizeof(hc.codelen), sizeof(hc.c), HUFFMAN_ALPHABET_SZ, 0);
-  print_codes(o_huffman.codetable,o_huffman.distinct);
-  make_deflate_codes(o_huffman.codetable,o_huffman.distinct);
-  radix_sort_xb((char**)o_huffman.codetable,0,sizeof(unsigned short)*8,o_huffman.distinct,0);
-  print_codes(o_huffman.codetable,o_huffman.distinct);
-  make_reverse_codes(&o_huffman);
-  */
   create_table(&o_huffman,cnodes,HUFFMAN_ALPHABET_SZ,15);
-  create_table(&d_huffman,dnodes,30,5);
-  /*
-  print_codes(o_huffman.revcodetable,o_huffman.distinct);
-  */
+  create_table(&d_huffman,dnodes,30,15);
+  
   next_ptr = 0,i=0;
   next_pos = -1;
-  if(next_ptr<WINDOW_SIZE){
+  if(next_ptr<WINDOW_SIZE && ptr_count>0){
     next_pos = lzss_ptrs[0].position;
   }
 
@@ -601,12 +596,6 @@ int main(int argv, char** argc){
   printf("\n");
   printf("BA L: %ld bits: %ld\n\n",ba.used,ba.bitcount);
   
-
-  /*
-  for(i=0;i<o_huffman.distinct;i++){
-    codetable[o_huffman.codetable[i]->c] = o_huffman.codetable[i]->codelen;
-  }
-  */
   bitarray bh;
   unsigned short lit_codelens[HUFFMAN_ALPHABET_SZ];
   unsigned short d_codelens[30];
@@ -621,49 +610,54 @@ int main(int argv, char** argc){
       combined[n++] = lit_codelens[i];
   for(i=0;i<d_n;i++)
       combined[n++] = d_codelens[i];
-  /*
-  for(i=0;i<lit_n;i++){
-    printf("%d %d\n",i,lit_codelens[i]);
+  for(i=0;i<n;i++){
+    if(combined[i])printf("%d: [%d] \n",i,combined[i]);
   }
-  */
-  /*
-  for(i=0;i<d_n;i++){
-    printf("%d %d\n",i,d_codelens[i]);
-  }*/
   int nc = rle_codelens(combined,n,compressedlens);
   printf("Code len [%d] processed: %d\n",n,nc);
   for(i=0;i<nc;i++){
     printf("%d %d\n",i,compressedlens[i].sym);
     count_clcodes(compressedlens[i].sym);
   }
-  create_table(&cl_huffman,clnodes,nc,3);
+  create_table(&cl_huffman,clnodes,nc,15);
   
   /*Write Header*/
-  printf("Header\n");
+  printf("\n\n==========Header===========\n\n");
   int cl_n = dump_codelens(cl_codelens,&cl_huffman,nc);
 
   int HLIT = lit_n-LCODEBASE;
   int HDIST = d_n-1;
-  int HCLEN = cl_n-4;
-
-  printf("HLIT:%d HDIST:%d HCLEN:%d\n",HLIT,HDIST,HCLEN);
   packbits(&bh,1,1);      /*BFINAL =1*/
   
   packbits(&bh,2,2);      /*BTYPE = 10*/
   packbits(&bh,HLIT,5);   
   packbits(&bh,HDIST,5);  
-  packbits(&bh,HCLEN,4);  
   
   printf("\n");
   char cl_lensbuffer [19]={0};
-  for(i=0;i<cl_n;i++){
-      printf("%d\n",cl_huffman.revcodetable[i]->c);
-      cl_lensbuffer[CODELEN_ORDER[cl_huffman.revcodetable[i]->c]] = cl_huffman.revcodetable[i]->code;
+  char max_cl=4;
+  for(i=0;i<19;i++){
+      if(!cl_huffman.revcodetable[i]) continue;
+      cl_lensbuffer[CODELEN_IDX_ORDER[cl_huffman.revcodetable[i]->c]] = cl_huffman.revcodetable[i]->codelen;
+      max_cl = cl_huffman.revcodetable[i]->codelen==0?max_cl:CODELEN_IDX_ORDER[i]>max_cl?CODELEN_IDX_ORDER[i]:max_cl;
   }
-  for(i=0;i<cl_n;i++){
-  for(i=0;i<n;i++){
-    packbits(&bh,cl_lensbuffer[i],3);
-    print_binary(cl_lensbuffer[i],3);
+  for(i=0;i<=max_cl;i++){
+    printf("%d\t[%d]: \t%d\n",i,CODELEN_ORDER[i],cl_lensbuffer[i]);
+  }
+  printf("\n");
+
+  int HCLEN = max_cl-3;
+
+  printf("HLIT:%d HDIST:%d HCLEN:%d\n",HLIT,HDIST,HCLEN);
+
+  packbits(&bh,HCLEN,4);  
+
+  printf("Pack bits for code lens\n");
+  for(i=0;i<HCLEN+4;i++){
+    int cl = reverse_bits(cl_lensbuffer[i],3);
+    packbits(&bh,cl,3);
+    print_binary(cl,3);
+    printf(" ");
   }
   
   free(ba.data);
@@ -673,7 +667,6 @@ int main(int argv, char** argc){
   free_huffman_heap(&d_huffman,29);
   
   free_huffman_heap(&cl_huffman,nc);
-  
-  
+   
   
 }

@@ -36,6 +36,7 @@ typedef struct huffcode{
   unsigned short c;
   unsigned short codelen;
   unsigned short code;
+  unsigned int freq;
 }huffcode;
 
 #define HN_FREQ_OFFSET ((size_t)&(((huffnode*)0)->freq))
@@ -46,6 +47,8 @@ typedef struct huffcode{
 #define HC_SYM_SIZE sizeof(((huffcode*)0)->c)
 #define HC_CLEN_OFFSET ((size_t)&(((huffcode*)0)->codelen))
 #define HC_CLEN_SIZE sizeof(((huffcode*)0)->codelen)
+#define HC_FREQ_OFFSET ((size_t)&(((huffcode*)0)->freq))
+#define HC_FREQ_SIZE sizeof(((huffcode*)0)->freq)
 
 typedef struct huffmancoder{
   short table[HUFFMAN_ALPHABET_SZ];
@@ -76,7 +79,7 @@ void make_reverse_codes(huffmancoder* obj);
 
 void limit_code_length(huffcode** code_list, size_t sz,size_t maxbits);
 
-void make_deflate_codes(huffcode** code_list, size_t sz);
+void make_deflate_codes(huffcode** code_list, size_t sz,int maxbits);
 
 /*return 1 if EOB else 0*/
 typedef int (*fdecode_symbol_fn)(short symbol, unsigned char* data, int* bitpos, int* bytepos);
