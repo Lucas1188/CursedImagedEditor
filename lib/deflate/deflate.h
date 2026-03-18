@@ -1,9 +1,10 @@
 #ifndef DEFLATE_H
 #define DEFLATE_H
 
+#include "../bithelper/bithelpers.h"
+
 #include <stdio.h>
 #include <stdlib.h>
-#include "../bithelpers.h"
 
 typedef enum EBTYPE{
   NOCOMPRESS  =  0, /*  Uncompressed  */
@@ -11,224 +12,36 @@ typedef enum EBTYPE{
   DYNCODE     =  2,    /*  Dynamic codes */
   RES         =  3  /*  Reserved      */
 }EBTYPE;
-/*
-typedef struct DEFLATE_BLK_EXP{
-  char BFINAL_1b;
-  char BTYPE_2b;
-  char* BLOCK;
-}DEFLATE_BLK;
-*/
+
 #define EOBCODE 256
 #define LCODEBASE 257
 #define MAX_DISTANCE 32768
 
-static const unsigned short DISTANCE_BASE[30]={
-  1,    2,    3,    4,    5,    7,
-  9,    13,   17,   25,   33,   49,
-  65,   97,   129,  193,  257,  385,
-  513,  769,  1025, 1537, 2049, 3073,
-  4097, 6145, 8193, 12289,  16385,  24577
-};
+extern const unsigned short DISTANCE_BASE[30];
 
-static const unsigned char DISTANCE_LENS[30]={
-  0,    0,    0,    0,    1,    1,
-  2,    2,    3,    3,    4,    4,
-  5,    5,    6,    6,    7,    7,
-  8,    8,    9,    9,    10,    10,
-  11,   11,   12,   12,   13,   13
-};
+extern const unsigned char DISTANCE_LENS[30];
 
-static int get_distance_code(short distance){
-  int lo = 0;
-  int hi = 29;
-  int mid;
+int get_distance_code(short distance);
 
-  while (lo <= hi) {
-    mid = (lo + hi) >> 1;
-    if (DISTANCE_BASE[mid] <= distance) {
-      if (mid == 29 || DISTANCE_BASE[mid + 1] > distance)
-        return mid;
-      lo = mid + 1;
-    }else {
-      hi = mid - 1;
-    }
-  }
-  return 0;
-} 
+extern const unsigned char LENCODE_EBITS[29];
 
-static const unsigned char LENCODE_EBITS[29]={/*Non literal codes*/
-  0,  0,  0,  0,  0,  0,
-  0,  0,  1,  1,  1,  1,
-  2,  2,  2,  2,  3,  3,
-  3,  3,  4,  4,  4,  4,
-  5,  5,  5,  5,  0
-};
-static const unsigned short LENCODE_BASE[29]={/*Non literal codes*/
-  3,    4,    5,    6,    7,    8,
-  9,    10,   11,   13,   15,   17,
-  19,   23,   27,   31,   35,   43,
-  51,   59,   67,   83,   99,   115,
-  131,  163,  195,  227,  258   
-};
+extern const unsigned char LENCODE_EBITS[29];
 
-static const unsigned char LENCODE_LOOKUP[259] = {
-/*0*/  0,
-/*1*/  0,
-/*2*/  0,
+extern const unsigned short LENCODE_BASE[29];
 
-/*3*/  0,  /*4*/  1,  /*5*/  2,  /*6*/  3,
-/*7*/  4,  /*8*/  5,  /*9*/  6,  /*10*/ 7,
+extern const unsigned char LENCODE_LOOKUP[259];
 
-/*11*/ 8,  /*12*/ 8,
-/*13*/ 9,  /*14*/ 9,
-/*15*/ 10, /*16*/ 10,
-/*17*/ 11, /*18*/ 11,
-
-/*19*/ 12, /*20*/ 12, /*21*/ 12, /*22*/ 12,
-/*23*/ 13, /*24*/ 13, /*25*/ 13, /*26*/ 13,
-/*27*/ 14, /*28*/ 14, /*29*/ 14, /*30*/ 14,
-/*31*/ 15, /*32*/ 15, /*33*/ 15, /*34*/ 15,
-
-/*35*/ 16, /*36*/ 16, /*37*/ 16, /*38*/ 16,
-/*39*/ 16, /*40*/ 16, /*41*/ 16, /*42*/ 16,
-/*43*/ 17, /*44*/ 17, /*45*/ 17, /*46*/ 17,
-/*47*/ 17, /*48*/ 17, /*49*/ 17, /*50*/ 17,
-
-/*51*/ 18, /*52*/ 18, /*53*/ 18, /*54*/ 18,
-/*55*/ 18, /*56*/ 18, /*57*/ 18, /*58*/ 18,
-/*59*/ 19, /*60*/ 19, /*61*/ 19, /*62*/ 19,
-/*63*/ 19, /*64*/ 19, /*65*/ 19, /*66*/ 19,
-
-/*67*/ 20, /*68*/ 20, /*69*/ 20, /*70*/ 20,
-/*71*/ 20, /*72*/ 20, /*73*/ 20, /*74*/ 20,
-/*75*/ 20, /*76*/ 20, /*77*/ 20, /*78*/ 20,
-/*79*/ 20, /*80*/ 20, /*81*/ 20, /*82*/ 20,
-
-/*83*/ 21, /*84*/ 21, /*85*/ 21, /*86*/ 21,
-/*87*/ 21, /*88*/ 21, /*89*/ 21, /*90*/ 21,
-/*91*/ 21, /*92*/ 21, /*93*/ 21, /*94*/ 21,
-/*95*/ 21, /*96*/ 21, /*97*/ 21, /*98*/ 21,
-
-/*99*/ 22,  /*100*/22,  /*101*/22,  /*102*/22,
-/*103*/22,  /*104*/22,  /*105*/22,  /*106*/22,
-/*107*/22,  /*108*/22,  /*109*/22,  /*110*/22,
-/*111*/22,  /*112*/22,  /*113*/22,  /*114*/22,
-
-/*115*/23, /*116*/23, /*117*/23, /*118*/23,
-/*119*/23, /*120*/23, /*121*/23, /*122*/23,
-/*123*/23, /*124*/23, /*125*/23, /*126*/23,
-/*127*/23, /*128*/23, /*129*/23, /*130*/23,
-
-/*131*/24, /*132*/24, /*133*/24, /*134*/24,
-/*135*/24, /*136*/24, /*137*/24, /*138*/24,
-/*139*/24, /*140*/24, /*141*/24, /*142*/24,
-/*143*/24, /*144*/24, /*145*/24, /*146*/24,
-/*147*/24, /*148*/24, /*149*/24, /*150*/24,
-/*151*/24, /*152*/24, /*153*/24, /*154*/24,
-/*155*/24, /*156*/24, /*157*/24, /*158*/24,
-/*159*/24, /*160*/24, /*161*/24, /*162*/24,
-
-/*163*/25, /*164*/25, /*165*/25, /*166*/25,
-/*167*/25, /*168*/25, /*169*/25, /*170*/25,
-/*171*/25, /*172*/25, /*173*/25, /*174*/25,
-/*175*/25, /*176*/25, /*177*/25, /*178*/25,
-/*179*/25, /*180*/25, /*181*/25, /*182*/25,
-/*183*/25, /*184*/25, /*185*/25, /*186*/25,
-/*187*/25, /*188*/25, /*189*/25, /*190*/25,
-/*191*/25, /*192*/25, /*193*/25, /*194*/25,
-
-/*195*/26, /*196*/26, /*197*/26, /*198*/26,
-/*199*/26, /*200*/26, /*201*/26, /*202*/26,
-/*203*/26, /*204*/26, /*205*/26, /*206*/26,
-/*207*/26, /*208*/26, /*209*/26, /*210*/26,
-/*211*/26, /*212*/26, /*213*/26, /*214*/26,
-/*215*/26, /*216*/26, /*217*/26, /*218*/26,
-/*219*/26, /*220*/26, /*221*/26, /*222*/26,
-/*223*/26, /*224*/26, /*225*/26, /*226*/26,
-
-/*227*/27, /*228*/27, /*229*/27, /*230*/27,
-/*231*/27, /*232*/27, /*233*/27, /*234*/27,
-/*235*/27, /*236*/27, /*237*/27, /*238*/27,
-/*239*/27, /*240*/27, /*241*/27, /*242*/27,
-/*243*/27, /*244*/27, /*245*/27, /*246*/27,
-/*247*/27, /*248*/27, /*249*/27, /*250*/27,
-/*251*/27, /*252*/27, /*253*/27, /*254*/27,
-/*255*/27, /*256*/27, /*257*/27,
-
-/*258*/28
-};
-
-const unsigned char CODELEN_ORDER[19] = {
-  16, 17, 18, 0,  8,  7,  9,  6,  10, 5,  /*10*/11, 4,  12, 3,  13, 2,  14, 1, 15
-};
-const unsigned char CODELEN_IDX_ORDER[19] = {
-  3, 17, 15, 13,  11,  9,  7,  5,  4,   6,  /*10*/8,  10,  12, 14,  16,   18,  0,   1,  2
-};
-const unsigned char CODELEN_EBITS[19] = {
-  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  2,  3, 7
-};
+extern const unsigned char CODELEN_ORDER[19];
+extern const unsigned char CODELEN_IDX_ORDER[19];
+extern const unsigned char CODELEN_EBITS[19];
+extern const unsigned char CODELEN_EBITS_BASE[19];
 
 typedef struct {
     unsigned char sym;
     unsigned short repeat; /* only used for 16,17,18 */
 }rletoken;
 
-int rle_codelens(const unsigned short *codelens,
-                 int sz,
-                 rletoken *out)
-{
-  int i = 0;
-  int w = 0;
-
-  while (i < sz) {
-
-    unsigned short cur = codelens[i];
-    int run = 1;
-
-    /* count run length */
-    while (i + run < sz && codelens[i + run] == cur)
-      run++;
-    int origin_run = run;
-    if (cur == 0) {
-      /* encode long zero runs */
-      while (run >= 11) {
-        int cnt = run > 138 ? 138 : run;
-        out[w++] = (rletoken){18, cnt};
-        run -= cnt;
-      }
-      if (run >= 3) {
-        int cnt = run > 10 ? 10 : run;
-        out[w++] = (rletoken){17, cnt};
-        run -= cnt;
-      }
-      while (run > 0) {
-        out[w++] = (rletoken){0,1};
-        run--;
-      }
-    }
-    else {
-      /* emit first literal length */
-      out[w++] = (rletoken){cur,1};
-      run--;
-
-      /* encode repeats of previous length */
-      while (run >= 3) {
-        int cnt = run > 6 ? 6 : run;
-        out[w++] = (rletoken){16, cnt};
-        run -= cnt;
-      }
-
-      while (run > 0) {
-        out[w++] = (rletoken){cur,1};
-        run--;
-      }
-    }
-    i += origin_run;
-  }
-  return w;
-}
-
 /*return bytes written*/
-int make_block(char* data);
+int deflate(bitarray* bBuffer, char* data,size_t input_sz);
 
 #endif

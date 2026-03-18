@@ -1,17 +1,9 @@
-#ifndef BITHELPER_H
-#define BITHELPER_H
-
+#include "../cursedhelpers.h"
+#include "bithelpers.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
 
-typedef struct bitarray{
-    unsigned char *data;
-    size_t   size;      /* allocated bytes */
-    size_t   used;      /* bytes written */
-    unsigned int bitbuf;    /* accumulator */
-    unsigned long bitcount;  /* bits currently in bitbuf */
-}bitarray;
 
 static int ensure_capacity(bitarray *bw, size_t extra_bytes)
 {
@@ -67,7 +59,7 @@ int bitarray_flush(bitarray *bw)
   return 1;
 }
 
-static unsigned short reverse_bits(unsigned short v, int bits)
+unsigned short reverse_bits(unsigned short v, int bits)
 {
     v = ((v & 0x5555) << 1) | ((v >> 1) & 0x5555);
     v = ((v & 0x3333) << 2) | ((v >> 2) & 0x3333);
@@ -76,7 +68,7 @@ static unsigned short reverse_bits(unsigned short v, int bits)
     return v >> (16 - bits);
 }
 
-static int read_bit(const unsigned char *data, int *bitpos, int *bytepos)
+int read_bit(const unsigned char *data, int *bitpos, int *bytepos)
 {
   int bit = (data[*bytepos] >> *bitpos) & 1;
   (*bitpos)++;
@@ -87,7 +79,7 @@ static int read_bit(const unsigned char *data, int *bitpos, int *bytepos)
   return bit;
 }
 
-static unsigned read_bits(const unsigned char *data, int *bitpos, int *bytepos, int n)
+unsigned read_bits(const unsigned char *data, int *bitpos, int *bytepos, int n)
 {
   unsigned val = 0;
   int i;
@@ -96,5 +88,3 @@ static unsigned read_bits(const unsigned char *data, int *bitpos, int *bytepos, 
   }
   return val;
 }
-
-#endif

@@ -1,3 +1,6 @@
+#ifndef SEARCH_H
+#define SEARCH_H
+
 #include <stddef.h>
 
 typedef int (*cmp_fn)(const void *key, const void *elem);
@@ -8,7 +11,7 @@ typedef int (*cmp_fn)(const void *key, const void *elem);
     1 if key > elem
 */
 
-long binarysearch(const void *key, const void *base, size_t count, size_t elem_size, cmp_fn cmp){
+static long binarysearch(const void *key, const void *base, size_t count, size_t elem_size, cmp_fn cmp){
     long left,mid,right;
     left = 0;
     mid = 0;
@@ -29,3 +32,5 @@ long binarysearch(const void *key, const void *base, size_t count, size_t elem_s
 
     return -1;
 }
+
+#endif

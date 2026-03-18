@@ -1,7 +1,7 @@
 #ifndef HUFFMAN_H
 #define HUFFMAN_H
 
-#include "../bithelpers.h"
+#include "../bithelper/bithelpers.h"
 
 #ifndef HUFFMAN_ALPHABET_SZ
 #define HUFFMAN_ALPHABET_SZ 286
@@ -11,12 +11,7 @@
 #define HUFFMAN_MAXBITS 15
 #endif
 
-
-unsigned int fib[17] = {
-  1, 1, 2, 3, 5, 8, 13, 21,
-  34, 55, 89, 144, 233, 377,
-  610, 987, 1597   /* include this for >15 bits */
-};
+extern unsigned int fib[17];
 
 typedef enum HUFF_NODE_TYPE{
   ROOT,
@@ -65,9 +60,9 @@ static void init_s_huffmancode(huffmancoder* obj){
   memset(obj,0,sizeof(struct huffmancoder));
 }
 
-static huffmancoder*  global_codingtable[4];
-static huffnode**     global_nodes[4];
-static char*          global_distancecodes[4];
+extern huffmancoder*  global_codingtable[4];
+extern huffnode**     global_nodes[4];
+extern char*          global_distancecodes[4];
 
 struct huffnode* make_node(short c, int freq, enum HUFF_NODE_TYPE type);
 
@@ -87,15 +82,5 @@ typedef int (*fdecode_symbol_fn)(short symbol, unsigned char* data, int* bitpos,
 void decode_bitstream(huffmancoder* hobj, unsigned char* data, size_t size, fdecode_symbol_fn fdsym);
 
 void rebuild_huffman_tree(huffmancoder* hobj, short* code_lens);
-
-void _t_make_test_string(char* b){
-  int i,s,w;
-  s =0;
-  for(i=0;i<17;i++){
-    for(w=0;w<fib[i];w++){
-      b[s++] = 'a'+i;
-    }
-  }
-}
 
 #endif

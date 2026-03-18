@@ -1,3 +1,5 @@
+#ifndef SORT_H
+#define SORT_H
 #include <string.h>
 
 static void radix_sort_xb(char **c_array, size_t offset_comparitor, size_t bits, size_t n, unsigned char desc)
@@ -69,3 +71,4 @@ static void insertion_sort_xxB(char **c_array, size_t key0_offset, size_t key1_o
     c_array[j + 1] = kptr;
   }
 }
+#endif
