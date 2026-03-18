@@ -324,8 +324,8 @@ int deflate(bitarray* bBuffer, char* data,size_t input_sz){
   unsigned short lit_codelens[HUFFMAN_ALPHABET_SZ];
   unsigned short d_codelens[30];
   unsigned short cl_codelens[19];
-  unsigned short combined[HUFFMAN_ALPHABET_SZ+30]={0};
-  rletoken compressedlens[HUFFMAN_ALPHABET_SZ+30]={0};
+  unsigned short combined[HUFFMAN_ALPHABET_SZ+30];
+  rletoken compressedlens[HUFFMAN_ALPHABET_SZ+30];
   int lit_n = dump_codelens(lit_codelens, &o_huffman,HUFFMAN_ALPHABET_SZ);
   int d_n = dump_codelens(d_codelens,&d_huffman,30);
   
