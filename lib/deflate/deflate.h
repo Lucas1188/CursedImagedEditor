@@ -29,7 +29,7 @@ extern const unsigned char LENCODE_EBITS[29];
 
 extern const unsigned short LENCODE_BASE[29];
 
-extern const unsigned char LENCODE_LOOKUP[259];
+extern const unsigned short LENCODE_LOOKUP[259];
 
 extern const unsigned char CODELEN_ORDER[19];
 extern const unsigned char CODELEN_IDX_ORDER[19];

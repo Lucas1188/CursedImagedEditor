@@ -15,11 +15,15 @@ typedef struct bitarray{
 
 static int ensure_capacity(bitarray *bw, size_t extra_bytes);
 
+size_t packbytes_aligned(bitarray *bw, const unsigned char *data, size_t n);
+
 size_t packbits(bitarray *bw, unsigned int value, unsigned short bits);
 
 int bitarray_flush(bitarray *bw);
 
 unsigned short reverse_bits(unsigned short v, int bits);
+unsigned int reverse_bits_int(unsigned int v, int bits);
+
 
 int read_bit(const unsigned char *data, int *bitpos, int *bytepos);
 

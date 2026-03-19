@@ -1,5 +1,6 @@
 #ifndef CURSEDHELPERS_H
 #define CURSEDHELPERS_H
+#include <stdio.h>
 
 extern void print_binary(int code,int len);
 

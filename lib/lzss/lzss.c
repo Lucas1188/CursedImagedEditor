@@ -27,10 +27,8 @@ int find_match(const char* window, int pos, int maxlen, int *best_dist)
     int len, cur, next,best_len = 0;
     int limit = (pos > WINDOW_SIZE) ? pos - WINDOW_SIZE : 0;
     int chain = LOOKAHEAD_SIZE;
-
     unsigned int h = hash3((const unsigned char*)(window + pos));
     cur = head[h];
-
     while (cur >= limit && chain--)
     {
       if (cur >= pos)
@@ -69,15 +67,20 @@ int generate_lzss_pointers(char* input,int input_size,slzss_pointer* lzss_ptrs,i
     remaining = input_size - pos;
     maxlen = remaining < LOOKAHEAD_SIZE ? remaining : LOOKAHEAD_SIZE;
     match_len = find_match(input, pos, maxlen, &dist);
+    /*LOG_I("pos: %d, match_len: %d, dist: %d\n", pos, match_len, dist);*/
     if(match_len >= MIN_MATCH){
-      emit_pointer(&lzss_ptrs[ptr_count++], pos, match_len, dist);
-      LOG_I("<%d,%d> ",match_len,dist);
-      fn_olptr(match_len,dist);
-      for(i=0;i<match_len;i++){
-        insert_hash((const unsigned char*)input, pos+i);
-        fn_literalcount(input[pos+i]);
-      }
-      pos += match_len - 1;
+        LOG_I("<%d,%d> \n",match_len,dist);
+        emit_pointer(&lzss_ptrs[ptr_count++], pos, match_len, dist);
+        
+
+        fn_olptr(match_len,dist);
+
+        for(i=0;i<match_len;i++){
+            insert_hash((const unsigned char*)input, pos+i);
+            fn_literalcount(input[pos+i]);
+        }
+
+        pos += match_len - 1;
     }
     else{
       insert_hash((const unsigned char*) input, pos);

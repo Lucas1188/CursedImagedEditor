@@ -24,6 +24,22 @@ static int ensure_capacity(bitarray *bw, size_t extra_bytes)
   bw->size = newsize;
   return 1;
 }
+size_t packbytes_aligned(bitarray *bw, const unsigned char *data, size_t n){
+  if(!bw){
+    return 0;
+  }
+  if(bw->bitcount!=0){
+    LOG_E("Bit buffer not empty, cannot pack bytes\n");
+    return 0;
+  }
+  if (!ensure_capacity(bw, n)){
+    LOG_E("Cannot make space for bitarray\n");
+    return 0;
+  }
+  memcpy(bw->data + bw->used, data, n);
+  bw->used += n;
+  return n;
+}
 
 size_t packbits(bitarray *bw, unsigned int value, unsigned short bits)
 {
@@ -68,6 +84,15 @@ unsigned short reverse_bits(unsigned short v, int bits)
     return v >> (16 - bits);
 }
 
+unsigned int reverse_bits_int(unsigned int v, int bits)
+{
+    v = ((v & 0x55555555) << 1) | ((v >> 1) & 0x55555555);
+    v = ((v & 0x33333333) << 2) | ((v >> 2) & 0x33333333);
+    v = ((v & 0x0F0F0F0F) << 4) | ((v >> 4) & 0x0F0F0F0F);
+    v = ((v & 0x00FF00FF) << 8) | ((v >> 8) & 0x00FF00FF);
+    v = (v << 16) | (v >> 16);
+    return v >> (32 - bits);
+}
 int read_bit(const unsigned char *data, int *bitpos, int *bytepos)
 {
   int bit = (data[*bytepos] >> *bitpos) & 1;
