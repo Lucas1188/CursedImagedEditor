@@ -64,7 +64,9 @@ extern huffmancoder*  global_codingtable[4];
 extern huffnode**     global_nodes[4];
 extern char*          global_distancecodes[4];
 
-struct huffnode* make_node(short c, int freq, enum HUFF_NODE_TYPE type);
+extern void count_clcodes(unsigned short symbol);
+
+struct huffnode* make_node(unsigned short c, int freq, enum HUFF_NODE_TYPE type);
 
 struct huffnode* build_huffman_tree(huffnode* nodes[], int size);
 

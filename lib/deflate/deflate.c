@@ -217,7 +217,7 @@ int rle_codelens(const unsigned short *codelens,
   return w;
 }
 
-void count_literals(short symbol){
+void count_literals(unsigned short symbol){
   huffmancoder* literalcodes= global_codingtable[0];
   /*if(symbol>=LCODEBASE){
     symbol = LCODEBASE+LENCODE_LOOKUP[symbol-LCODEBASE];
@@ -226,17 +226,17 @@ void count_literals(short symbol){
   long* r = &(literalcodes->freq[symbol]); 
   if(*r==0){
     literalcodes->table[symbol]=literalcodes->distinct;
+    if(global_nodes[0][literalcodes->distinct]){
+      LOG_E("Duplicate symbol: %d\n",symbol);
+    }
     global_nodes[0][literalcodes->distinct] = make_node(symbol,0,LEAF);
     literalcodes->distinct++;
   }
   (*r)++;    
-  c=literalcodes->table[symbol];
-  /*LOG_I("Counting literal: %hd\n", literalcodes->table[symbol]);*/
   global_nodes[0][literalcodes->table[symbol]]->freq++;
-
 }
 
-void count_ldcodes(short length, short distance){
+void count_ldcodes(unsigned short length, unsigned short distance){
   huffmancoder* dlcodes= global_codingtable[1];
   int dcode;
   long* r;
@@ -255,12 +255,12 @@ void count_ldcodes(short length, short distance){
   count_literals(LENCODE_LOOKUP[length]);
 }
 
-int deflate(bitarray* bBuffer, char* data,size_t input_sz){
+int deflate(bitarray* bBuffer, unsigned char* data,size_t input_sz){
 
-    char* input,distance_codes[WINDOW_SIZE];
+    unsigned char* input,distance_codes[WINDOW_SIZE];
     int i,j,min,f,offset,offset1,pos,dist,match_len,ptr_count,next_ptr,next_pos,input_size;
     long *r;
-    short codetable[HUFFMAN_ALPHABET_SZ],sym,lcode;
+    unsigned short codetable[HUFFMAN_ALPHABET_SZ],sym,lcode;
     huffnode* cnodes[HUFFMAN_ALPHABET_SZ],*dnodes[29],*clnodes[18];
     slzss_pointer lzss_ptrs[WINDOW_SIZE];
     huffmancoder o_huffman,cl_huffman,d_huffman;
@@ -299,7 +299,6 @@ int deflate(bitarray* bBuffer, char* data,size_t input_sz){
     LOG_I("\nTotal ptrs: %d ->%d\n",ptr_count,pos);
     
     LOG_I("Parsed %d %d symbols\n",pos,o_huffman.distinct);
-    
     create_table(&o_huffman,cnodes,HUFFMAN_ALPHABET_SZ,15);
     create_table(&d_huffman,dnodes,30,15);
     
@@ -316,9 +315,11 @@ int deflate(bitarray* bBuffer, char* data,size_t input_sz){
         combined[n++] = lit_codelens[i];
     for(i=0;i<d_n;i++)
         combined[n++] = d_codelens[i];
-    for(i=0;i<n;i++){
+    /*
+        for(i=0;i<n;i++){
         if(combined[i])LOG_I("%d: [%d] \n",i,combined[i]);
     }
+    */
     int nc = rle_codelens(combined,n,compressedlens);
     LOG_I("Code len [%d] processed: %d\n",nc,n);
     for(i=0;i<nc;i++){
@@ -394,24 +395,27 @@ int deflate(bitarray* bBuffer, char* data,size_t input_sz){
     }
 
     while(i<input_size){
-        if(i==next_pos){    
+        if(i==next_pos){
+            LOG_I("<");    
             sym = lzss_ptrs[next_ptr].length;
             lcode = LENCODE_LOOKUP[sym];
             packbits(bh,o_huffman.revcodetable[lcode]->code,o_huffman.revcodetable[lcode]->codelen);
             PRINT_BINARY(o_huffman.revcodetable[lcode]->code,o_huffman.revcodetable[lcode]->codelen);
             packbits(bh,sym-LENCODE_BASE[lcode-LCODEBASE],LENCODE_EBITS[lcode-LCODEBASE]);/*write length literal*/
             PRINT_BINARY(sym-LENCODE_BASE[lcode-LCODEBASE],LENCODE_EBITS[lcode-LCODEBASE]);
-            LOG_I("<%d|%d ",lcode,sym);
             sym = lzss_ptrs[next_ptr].distance;
             lcode = global_distancecodes[0][next_ptr];
-            LOG_I(" %d|%d>",lcode,sym);
             packbits(bh,d_huffman.revcodetable[lcode]->code,d_huffman.revcodetable[lcode]->codelen);
             PRINT_BINARY(d_huffman.revcodetable[lcode]->code,d_huffman.revcodetable[lcode]->codelen);
             packbits(bh,sym-DISTANCE_BASE[lcode],DISTANCE_LENS[lcode]);/*write distance*/
             PRINT_BINARY(sym-DISTANCE_BASE[lcode],DISTANCE_LENS[lcode]);
             i+=lzss_ptrs[next_ptr].length;
             next_pos = lzss_ptrs[++next_ptr].position;
+            LOG_I("\b>\n");
         }else{
+            if(!o_huffman.revcodetable[input[i]]){
+                LOG_E("No code for symbol: %d\n",input[i]);
+            }
             packbits(bh,o_huffman.revcodetable[input[i]]->code,o_huffman.revcodetable[input[i]]->codelen);
             PRINT_BINARY(o_huffman.revcodetable[input[i]]->code,o_huffman.revcodetable[input[i]]->codelen);
             i++;

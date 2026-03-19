@@ -25,8 +25,8 @@ typedef struct slzss{
   size_t lastwritepos;
 }slzss;
 
-typedef void (*f_on_emit_lzss_ptr)(short length, short distance);
-typedef void (*f_count_distinct_literal)(short symbol);
+typedef void (*f_on_emit_lzss_ptr)(unsigned short length, unsigned short distance);
+typedef void (*f_count_distinct_literal)(unsigned short symbol);
 
 extern void emit_pointer(slzss_pointer* sp, unsigned long pos, unsigned short match_len, unsigned short dist);
 

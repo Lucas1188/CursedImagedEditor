@@ -37,11 +37,11 @@ extern const unsigned char CODELEN_EBITS[19];
 extern const unsigned char CODELEN_EBITS_BASE[19];
 
 typedef struct {
-    unsigned char sym;
+    unsigned short sym;
     unsigned short repeat; /* only used for 16,17,18 */
 }rletoken;
 
 /*return bytes written*/
-int deflate(bitarray* bBuffer, char* data,size_t input_sz);
+int deflate(bitarray* bBuffer, unsigned char* data,size_t input_sz);
 
 #endif

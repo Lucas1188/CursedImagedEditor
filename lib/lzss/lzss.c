@@ -61,30 +61,38 @@ int generate_lzss_pointers(char* input,int input_size,slzss_pointer* lzss_ptrs,i
                             ){
   
   int ptr_count,remaining,maxlen,match_len,pos,dist,i;
+  unsigned short symbol;
+  unsigned char* s;
   ptr_count = 0;
   for(pos = 0; pos < input_size /*- MIN_MATCH*/; pos++){
     dist = 0;
     remaining = input_size - pos;
     maxlen = remaining < LOOKAHEAD_SIZE ? remaining : LOOKAHEAD_SIZE;
     match_len = find_match(input, pos, maxlen, &dist);
-    /*LOG_I("pos: %d, match_len: %d, dist: %d\n", pos, match_len, dist);*/
     if(match_len >= MIN_MATCH){
-        LOG_I("<%d,%d> \n",match_len,dist);
-        emit_pointer(&lzss_ptrs[ptr_count++], pos, match_len, dist);
+
+        /*LOG_I("<%d,%d> \n",match_len,dist);*/
+        emit_pointer(&lzss_ptrs[ptr_count++], pos, (unsigned short)match_len, (unsigned short)dist);
         
 
-        fn_olptr(match_len,dist);
+        fn_olptr((unsigned short)match_len,(unsigned short)dist);
 
         for(i=0;i<match_len;i++){
             insert_hash((const unsigned char*)input, pos+i);
-            fn_literalcount(input[pos+i]);
+            s = (unsigned char*)&symbol;
+            s[0] = input[pos+i];
+            s[1] = 0;
+            fn_literalcount(symbol);
         }
 
         pos += match_len - 1;
     }
     else{
       insert_hash((const unsigned char*) input, pos);
-      fn_literalcount(input[pos]);
+      s = (unsigned char*)&symbol;
+      s[0] = input[pos];
+      s[1] = 0;
+      fn_literalcount(symbol);
       /*printf("%c",input[pos]);*/
     }
     if(ptr_count==ptr_n){

@@ -20,14 +20,14 @@ unsigned int fib[17] = {
   610, 987, 1597   /* include this for >15 bits */
 };
 
-struct huffnode* make_p_node(short c, int freq,struct huffnode* l,struct huffnode* r, enum HUFF_NODE_TYPE type){
+struct huffnode* make_p_node(unsigned short c, int freq,struct huffnode* l,struct huffnode* r, enum HUFF_NODE_TYPE type){
   huffnode * hn = make_node(c,freq,type);
   hn->node0=l;
   hn->node1=r;
   return hn;
 }
 
-struct huffnode* make_node(short c, int freq, enum HUFF_NODE_TYPE type){
+struct huffnode* make_node(unsigned short c, int freq, enum HUFF_NODE_TYPE type){
   huffnode * hn;
   hn = malloc(sizeof(huffnode));
   hn->c = c;
@@ -36,7 +36,7 @@ struct huffnode* make_node(short c, int freq, enum HUFF_NODE_TYPE type){
   return hn;
 }
 
-struct huffcode* make_code(short c,unsigned char len, unsigned short code, unsigned int frequency){
+struct huffcode* make_code(unsigned short c,unsigned short len, unsigned short code, unsigned int frequency){
   huffcode* hc;
   hc = malloc(sizeof(huffcode));
   hc->c = c;
@@ -127,8 +127,9 @@ huffnode* build_huffman_tree(huffnode* nodes[], int size){
 
     while(n > 1){
       int i;
+      /*
       print_nodes(nodes, n);
-
+      */
       l = nodes[0];
       r = nodes[1];
       p = make_p_node(0, l->freq + r->freq, l, r, PARENT);
@@ -228,7 +229,7 @@ void rebuild_huffman_tree(huffmancoder* hobj, short* code_lens)
   }
 }
 
-void generate_codes(huffnode* cnode,huffcode** code_list,unsigned char clen,unsigned short ccode){
+void generate_codes(huffnode* cnode,huffcode** code_list,unsigned short clen,unsigned short ccode){
   unsigned short n0code, n1code;
   huffcode* hc;
 
@@ -253,7 +254,6 @@ void limit_code_length(huffcode** code_list, size_t n, size_t maxbits)
     size_t i;
 
     int bl_count[MAX_CODELEN] = {0};
-
     for (i = 0; i < n; i++) {
       int len = code_list[i]->codelen;
       if (len >= MAX_CODELEN) len = MAX_CODELEN - 1;
@@ -263,6 +263,7 @@ void limit_code_length(huffcode** code_list, size_t n, size_t maxbits)
     int overflow = 0;
     for (i = maxbits + 1; i < MAX_CODELEN; i++) {
       overflow += bl_count[i];
+      
     }
 
     bl_count[maxbits] += overflow;
@@ -286,13 +287,21 @@ void limit_code_length(huffcode** code_list, size_t n, size_t maxbits)
     }
 
     size_t idx = 0;
-    int len;
+    int len,count;
+
     for (len = 1; len <= (int)maxbits; len++) {
-      int count = bl_count[len];
-      while (count-- > 0) {
-          code_list[idx++]->codelen = len;
-      }
+        count = bl_count[len];
+
+        while (count > 0 && idx < n) {
+            code_list[idx++]->codelen = len;
+            count--;
+        }
     }
+
+    if (idx != n) {
+        LOG_E("Mismatch after limiting: idx=%ld, n=%ld\n", idx, n);
+    }
+
 }
 
 
@@ -344,7 +353,7 @@ int parse_symbol(short symbol, unsigned char* data, int* bitpos, int* bytepos){
   }
 }
 
-void count_clcodes(short symbol){
+void count_clcodes(unsigned short symbol){
   huffmancoder* clcodes= global_codingtable[2];
   long* r = &clcodes->freq[symbol];
   if(*r==0){
@@ -377,7 +386,8 @@ void create_table(huffmancoder* hobj,huffnode** nodes,int stack_sz,int limit_len
   
   LOG_I(" Ok\n\nLimit Length:\n");
   limit_code_length(hobj->codetable,hobj->distinct,limit_len);
-  
+  LOG_I(" Ok\n\nResorting:\n");
+
   insertion_sort_xxB((char**)hobj->codetable, HC_CLEN_OFFSET, HC_SYM_OFFSET, HC_CLEN_SIZE, HC_SYM_SIZE, HUFFMAN_ALPHABET_SZ, 0);
   
   print_codes(hobj->codetable,hobj->distinct);
