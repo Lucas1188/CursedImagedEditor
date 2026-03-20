@@ -17,31 +17,31 @@ typedef enum EBTYPE{
 #define LCODEBASE 257
 #define MAX_DISTANCE 32768
 
-extern const unsigned short DISTANCE_BASE[30];
+extern const uint16_t DISTANCE_BASE[30];
 
-extern const unsigned char DISTANCE_LENS[30];
+extern const uint8_t DISTANCE_LENS[30];
 
 int get_distance_code(short distance);
 
-extern const unsigned char LENCODE_EBITS[29];
+extern const uint8_t LENCODE_EBITS[29];
 
-extern const unsigned char LENCODE_EBITS[29];
+extern const uint8_t LENCODE_EBITS[29];
 
-extern const unsigned short LENCODE_BASE[29];
+extern const uint16_t LENCODE_BASE[29];
 
-extern const unsigned short LENCODE_LOOKUP[259];
+extern const uint16_t LENCODE_LOOKUP[259];
 
-extern const unsigned char CODELEN_ORDER[19];
-extern const unsigned char CODELEN_IDX_ORDER[19];
-extern const unsigned char CODELEN_EBITS[19];
-extern const unsigned char CODELEN_EBITS_BASE[19];
+extern const uint8_t CODELEN_ORDER[19];
+extern const uint8_t CODELEN_IDX_ORDER[19];
+extern const uint8_t CODELEN_EBITS[19];
+extern const uint8_t CODELEN_EBITS_BASE[19];
 
 typedef struct {
-    unsigned short sym;
-    unsigned short repeat; /* only used for 16,17,18 */
+    uint16_t sym;
+    uint16_t repeat; /* only used for 16,17,18 */
 }rletoken;
 
 /*return bytes written*/
-int deflate(bitarray* bBuffer, unsigned char* data,size_t input_sz);
+int deflate(bitarray* bBuffer, uint8_t* data,size_t input_sz);
 
 #endif

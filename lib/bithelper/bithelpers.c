@@ -8,7 +8,7 @@
 static int ensure_capacity(bitarray *bw, size_t extra_bytes)
 {
   size_t newsize;
-  unsigned char *tmp;
+  uint8_t *tmp;
   if (bw->used + extra_bytes <= bw->size){
     return 1;
   }
@@ -24,7 +24,7 @@ static int ensure_capacity(bitarray *bw, size_t extra_bytes)
   bw->size = newsize;
   return 1;
 }
-size_t packbytes_aligned(bitarray *bw, const unsigned char *data, size_t n){
+size_t packbytes_aligned(bitarray *bw, const uint8_t *data, size_t n){
   if(!bw){
     return 0;
   }
@@ -41,8 +41,9 @@ size_t packbytes_aligned(bitarray *bw, const unsigned char *data, size_t n){
   return n;
 }
 
-size_t packbits(bitarray *bw, unsigned int value, unsigned short bits)
+size_t packbits(bitarray *bw, uint32_t value, uint16_t bits)
 {
+  if(bits==0) return 0;
   if (!bw || bits > 16){
     return 0;
   }
@@ -66,6 +67,7 @@ int bitarray_flush(bitarray *bw)
 {
   if (bw->bitcount > 0) {
     if (!ensure_capacity(bw, 1)){
+      LOG_E("Could not Flush bitarray!\n");
       return 0;
     }
     bw->data[bw->used++] = bw->bitbuf & 0xFF;
@@ -75,7 +77,7 @@ int bitarray_flush(bitarray *bw)
   return 1;
 }
 
-unsigned short reverse_bits(unsigned short v, int bits)
+uint16_t reverse_bits(uint16_t v, int bits)
 {
     v = ((v & 0x5555) << 1) | ((v >> 1) & 0x5555);
     v = ((v & 0x3333) << 2) | ((v >> 2) & 0x3333);
@@ -84,7 +86,7 @@ unsigned short reverse_bits(unsigned short v, int bits)
     return v >> (16 - bits);
 }
 
-unsigned int reverse_bits_int(unsigned int v, int bits)
+uint32_t reverse_bits_int(uint32_t v, int bits)
 {
     v = ((v & 0x55555555) << 1) | ((v >> 1) & 0x55555555);
     v = ((v & 0x33333333) << 2) | ((v >> 2) & 0x33333333);
@@ -93,7 +95,7 @@ unsigned int reverse_bits_int(unsigned int v, int bits)
     v = (v << 16) | (v >> 16);
     return v >> (32 - bits);
 }
-int read_bit(const unsigned char *data, int *bitpos, int *bytepos)
+int read_bit(const uint8_t *data, int *bitpos, int *bytepos)
 {
   int bit = (data[*bytepos] >> *bitpos) & 1;
   (*bitpos)++;
@@ -104,9 +106,9 @@ int read_bit(const unsigned char *data, int *bitpos, int *bytepos)
   return bit;
 }
 
-unsigned read_bits(const unsigned char *data, int *bitpos, int *bytepos, int n)
+uint32_t read_bits(const uint8_t *data, int *bitpos, int *bytepos, int n)
 {
-  unsigned val = 0;
+  uint32_t val = 0;
   int i;
   for(i = 0; i < n; i++){
       val |= read_bit(data, bitpos, bytepos) << i;

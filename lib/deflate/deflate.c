@@ -5,7 +5,7 @@
 #include "../cursedhelpers.h"
 #include "../huffman/huffman.h"
 #include "../lzss/lzss.h"
-const unsigned short DISTANCE_BASE[30]={
+const uint16_t DISTANCE_BASE[30]={
   1,    2,    3,    4,    5,    7,
   9,    13,   17,   25,   33,   49,
   65,   97,   129,  193,  257,  385,
@@ -13,7 +13,7 @@ const unsigned short DISTANCE_BASE[30]={
   4097, 6145, 8193, 12289,  16385,  24577
 };
 
-const unsigned char DISTANCE_LENS[30]={
+const uint8_t DISTANCE_LENS[30]={
   0,    0,    0,    0,    1,    1,
   2,    2,    3,    3,    4,    4,
   5,    5,    6,    6,    7,    7,
@@ -31,14 +31,14 @@ int get_distance_code(short distance){
   return 29;
 }
 
-const unsigned char LENCODE_EBITS[29]={/*Non literal codes*/
+const uint8_t LENCODE_EBITS[29]={/*Non literal codes*/
   0,  0,  0,  0,  0,  0,
   0,  0,  1,  1,  1,  1,
   2,  2,  2,  2,  3,  3,
   3,  3,  4,  4,  4,  4,
   5,  5,  5,  5,  0
 };
-const unsigned short LENCODE_BASE[29]={/*Non literal codes*/
+const uint16_t LENCODE_BASE[29]={/*Non literal codes*/
   3,    4,    5,    6,    7,    8,
   9,    10,   11,   13,   15,   17,
   19,   23,   27,   31,   35,   43,
@@ -46,7 +46,7 @@ const unsigned short LENCODE_BASE[29]={/*Non literal codes*/
   131,  163,  195,  227,  258   
 };
 
-const unsigned short LENCODE_LOOKUP[259] = {
+const uint16_t LENCODE_LOOKUP[259] = {
 /*0*/  0,
 /*1*/  0,
 /*2*/  0,
@@ -116,16 +116,16 @@ const unsigned short LENCODE_LOOKUP[259] = {
 /*258*/285
 };
 
-const unsigned char CODELEN_ORDER[19] = {
+const uint8_t CODELEN_ORDER[19] = {
   16, 17, 18, 0,  8,  7,  9,  6,  10, 5,  /*10*/11, 4,  12, 3,  13, 2,  14, 1, 15
 };
-const unsigned char CODELEN_IDX_ORDER[19] = {
+const uint8_t CODELEN_IDX_ORDER[19] = {
   3, 17, 15, 13,  11,  9,  7,  5,  4,   6,  /*10*/8,  10,  12, 14,  16,   18,  0,   1,  2
 };
-const unsigned char CODELEN_EBITS[19] = {
+const uint8_t CODELEN_EBITS[19] = {
   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  2,  3, 7
 };
-const unsigned char CODELEN_EBITS_BASE[19] = {
+const uint8_t CODELEN_EBITS_BASE[19] = {
   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  3,  3, 11
 };
 
@@ -162,7 +162,7 @@ void make_deflate_codes(huffcode **table, size_t max_code, int maxbits) {
     }
 }
 
-int rle_codelens(const unsigned short *codelens,
+int rle_codelens(const uint16_t *codelens,
                  int sz,
                  rletoken *out)
 {
@@ -171,7 +171,7 @@ int rle_codelens(const unsigned short *codelens,
 
   while (i < sz) {
 
-    unsigned short cur = codelens[i];
+    uint16_t cur = codelens[i];
     int run = 1;
 
     /* count run length */
@@ -217,7 +217,7 @@ int rle_codelens(const unsigned short *codelens,
   return w;
 }
 
-void count_literals(unsigned short symbol){
+void count_literals(uint16_t symbol){
   huffmancoder* literalcodes= global_codingtable[0];
   /*if(symbol>=LCODEBASE){
     symbol = LCODEBASE+LENCODE_LOOKUP[symbol-LCODEBASE];
@@ -236,7 +236,7 @@ void count_literals(unsigned short symbol){
   global_nodes[0][literalcodes->table[symbol]]->freq++;
 }
 
-void count_ldcodes(unsigned short length, unsigned short distance){
+void count_ldcodes(uint16_t length, uint16_t distance){
   huffmancoder* dlcodes= global_codingtable[1];
   int dcode;
   long* r;
@@ -255,12 +255,12 @@ void count_ldcodes(unsigned short length, unsigned short distance){
   count_literals(LENCODE_LOOKUP[length]);
 }
 
-int deflate(bitarray* bBuffer, unsigned char* data,size_t input_sz){
+int deflate(bitarray* bBuffer, uint8_t* data,size_t input_sz){
 
-    unsigned char* input,distance_codes[WINDOW_SIZE];
+    uint8_t* input,distance_codes[WINDOW_SIZE];
     int i,j,min,f,offset,offset1,pos,dist,match_len,ptr_count,next_ptr,next_pos,input_size;
     long *r;
-    unsigned short codetable[HUFFMAN_ALPHABET_SZ],sym,lcode;
+    uint16_t codetable[HUFFMAN_ALPHABET_SZ],sym,lcode;
     huffnode* cnodes[HUFFMAN_ALPHABET_SZ],*dnodes[29],*clnodes[18];
     slzss_pointer lzss_ptrs[WINDOW_SIZE];
     huffmancoder o_huffman,cl_huffman,d_huffman;
@@ -302,10 +302,10 @@ int deflate(bitarray* bBuffer, unsigned char* data,size_t input_sz){
     create_table(&o_huffman,cnodes,HUFFMAN_ALPHABET_SZ,15);
     create_table(&d_huffman,dnodes,30,15);
     
-    unsigned short lit_codelens[HUFFMAN_ALPHABET_SZ];
-    unsigned short d_codelens[30];
-    unsigned short cl_codelens[19];
-    unsigned short combined[HUFFMAN_ALPHABET_SZ+30];
+    uint16_t lit_codelens[HUFFMAN_ALPHABET_SZ];
+    uint16_t d_codelens[30];
+    uint16_t cl_codelens[19];
+    uint16_t combined[HUFFMAN_ALPHABET_SZ+30];
     rletoken compressedlens[HUFFMAN_ALPHABET_SZ+30];
     int lit_n = dump_codelens(lit_codelens, &o_huffman,HUFFMAN_ALPHABET_SZ);
     int d_n = dump_codelens(d_codelens,&d_huffman,30);
@@ -330,7 +330,7 @@ int deflate(bitarray* bBuffer, unsigned char* data,size_t input_sz){
     
     /*Write Header*/
     LOG_I("\n\n==========Header===========\n");
-    int cl_n = dump_codelens(cl_codelens,&cl_huffman,nc);
+    int cl_n = dump_codelens(cl_codelens,&cl_huffman,19);
 
     int HLIT = lit_n-LCODEBASE;
     int HDIST = d_n-1;
@@ -361,7 +361,7 @@ int deflate(bitarray* bBuffer, unsigned char* data,size_t input_sz){
     packbits(bh,HDIST,5);  
     PRINT_BINARY(HDIST,5);
     packbits(bh,HCLEN,4);  
-    PRINT_BINARY(reverse_bits(HCLEN,4),4);
+    PRINT_BINARY(HCLEN,4);
     LOG_I("\n\nPacked bits for code lens\n");
     
     for(i=0;i<HCLEN+4;i++){
@@ -396,7 +396,6 @@ int deflate(bitarray* bBuffer, unsigned char* data,size_t input_sz){
 
     while(i<input_size){
         if(i==next_pos){
-            LOG_I("<");    
             sym = lzss_ptrs[next_ptr].length;
             lcode = LENCODE_LOOKUP[sym];
             packbits(bh,o_huffman.revcodetable[lcode]->code,o_huffman.revcodetable[lcode]->codelen);
@@ -407,11 +406,11 @@ int deflate(bitarray* bBuffer, unsigned char* data,size_t input_sz){
             lcode = global_distancecodes[0][next_ptr];
             packbits(bh,d_huffman.revcodetable[lcode]->code,d_huffman.revcodetable[lcode]->codelen);
             PRINT_BINARY(d_huffman.revcodetable[lcode]->code,d_huffman.revcodetable[lcode]->codelen);
+
             packbits(bh,sym-DISTANCE_BASE[lcode],DISTANCE_LENS[lcode]);/*write distance*/
             PRINT_BINARY(sym-DISTANCE_BASE[lcode],DISTANCE_LENS[lcode]);
             i+=lzss_ptrs[next_ptr].length;
             next_pos = lzss_ptrs[++next_ptr].position;
-            LOG_I("\b>\n");
         }else{
             if(!o_huffman.revcodetable[input[i]]){
                 LOG_E("No code for symbol: %d\n",input[i]);
@@ -428,7 +427,7 @@ int deflate(bitarray* bBuffer, unsigned char* data,size_t input_sz){
     
     free_huffman_heap(&d_huffman,30);
     
-    free_huffman_heap(&cl_huffman,nc);
+    free_huffman_heap(&cl_huffman,19);
 
     return pos;
 }

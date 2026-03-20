@@ -14,6 +14,7 @@ typedef enum EFLG{
     FNAME = 8,
     FCOMMENT = 16
 }EFLG;
+
 typedef enum EOS{
     OS_FAT = 0,
     OS_AMIGA = 1,
@@ -39,18 +40,18 @@ typedef enum EXFLG{
 
 
 typedef struct gzip_header{
-  unsigned char id1;
-  unsigned char id2;
-  unsigned char cm;
-  unsigned char flg;
-  unsigned int mtime;
-  unsigned char xfl;
-  unsigned char os;
+  uint8_t id1;
+  uint8_t id2;
+  uint8_t cm;
+  uint8_t flg;
+  uint32_t mtime;
+  uint8_t xfl;
+  uint8_t os;
 }gzip_header;
 
 typedef struct gzip_footer{
-  unsigned int crc32;
-  unsigned int isize;
+  uint32_t crc32;
+  uint32_t isize;
 }gzip_footer;
 
 typedef struct gzip_file{
@@ -60,6 +61,6 @@ typedef struct gzip_file{
   gzip_footer footer;
 }gzip_file;
 
-int write_gzip_from_file(const char* filename, bitarray* bData);
+uint32_t write_gzip_from_file(const char* filename, bitarray* bData);
 
 #endif

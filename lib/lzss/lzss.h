@@ -7,11 +7,12 @@
 #define MIN_MATCH 3
 #define LAYERS 3
 #include <stdio.h>
+#include <stdint.h>
 
 typedef struct slzss_pointer{
-  unsigned long position;
-  unsigned long length; /*Literal*/
-  unsigned long distance;
+  uint64_t position;
+  uint64_t length; /*Literal*/
+  uint64_t distance;
 }slzss_pointer;
 
 typedef struct slzss{
@@ -20,25 +21,25 @@ typedef struct slzss{
     window,
     pos,
     inputsize;
-  char* inputbuffer;
-  char* outputbuffer;
+  uint8_t* inputbuffer;
+  uint8_t* outputbuffer;
   size_t lastwritepos;
 }slzss;
 
-typedef void (*f_on_emit_lzss_ptr)(unsigned short length, unsigned short distance);
-typedef void (*f_count_distinct_literal)(unsigned short symbol);
+typedef void (*f_on_emit_lzss_ptr)(uint16_t length, uint16_t distance);
+typedef void (*f_count_distinct_literal)(uint16_t symbol);
 
-extern void emit_pointer(slzss_pointer* sp, unsigned long pos, unsigned short match_len, unsigned short dist);
+extern void emit_pointer(slzss_pointer* sp, uint64_t pos, uint16_t match_len, uint16_t dist);
 
-static unsigned int head[1<<24-1];   /* head of chain for each hash */
-static unsigned int prev[1<<24-1]; /* previous positions in the same hash */
+static uint32_t head[1<<24-1];   /* head of chain for each hash */
+static uint32_t prev[1<<24-1]; /* previous positions in the same hash */
 
-extern unsigned int hash3(const unsigned char *buf);
-extern void insert_hash(const unsigned char* window, int pos);
+extern uint32_t hash3(const uint8_t *buf);
+extern void insert_hash(const uint8_t* window, int pos);
 
-extern int find_match(const char* window, int pos, int maxlen, int *best_dist);
+extern int find_match(const uint8_t* window, int pos, int maxlen, int *best_dist);
 /*return ptr count*/
-extern int generate_lzss_pointers(char* input,int input_size,slzss_pointer* lzss_ptrs,int ptr_n,int* data_cnt,
+extern int generate_lzss_pointers(uint8_t* input,int input_size,slzss_pointer* lzss_ptrs,int ptr_n,int* data_cnt,
                             f_on_emit_lzss_ptr fn_olptr,
                             f_count_distinct_literal fn_literalcount
                             );

@@ -6,27 +6,27 @@
 #include <stdint.h>
 
 typedef struct bitarray{
-    unsigned char *data;
+    uint8_t *data;
     size_t   size;      /* allocated bytes */
     size_t   used;      /* bytes written */
-    unsigned int bitbuf;    /* accumulator */
-    unsigned long bitcount;  /* bits currently in bitbuf */
+    uint32_t bitbuf;    /* accumulator */
+    uint64_t bitcount;  /* bits currently in bitbuf */
 }bitarray;
 
 static int ensure_capacity(bitarray *bw, size_t extra_bytes);
 
-size_t packbytes_aligned(bitarray *bw, const unsigned char *data, size_t n);
+size_t packbytes_aligned(bitarray *bw, const uint8_t *data, size_t n);
 
-size_t packbits(bitarray *bw, unsigned int value, unsigned short bits);
+size_t packbits(bitarray *bw, uint32_t value, uint16_t bits);
 
 int bitarray_flush(bitarray *bw);
 
-unsigned short reverse_bits(unsigned short v, int bits);
-unsigned int reverse_bits_int(unsigned int v, int bits);
+uint16_t reverse_bits(uint16_t v, int bits);
+uint32_t reverse_bits_int(uint32_t v, int bits);
 
 
-int read_bit(const unsigned char *data, int *bitpos, int *bytepos);
+int read_bit(const uint8_t *data, int *bitpos, int *bytepos);
 
-unsigned read_bits(const unsigned char *data, int *bitpos, int *bytepos, int n);
+uint32_t read_bits(const uint8_t *data, int *bitpos, int *bytepos, int n);
 
 #endif

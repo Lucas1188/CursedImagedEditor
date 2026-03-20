@@ -3,7 +3,7 @@
 #include <stdio.h>
 
 extern void print_binary(int code,int len);
-#define VERBOSE
+#define DEBUG
 
 #ifdef DEBUG
   #define LOG_I(fmt, ...) do { printf(fmt, ##__VA_ARGS__); } while(0)

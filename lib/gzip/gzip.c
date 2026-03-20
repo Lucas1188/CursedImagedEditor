@@ -1,31 +1,16 @@
 #include "gzip.h"
 #include "../deflate/deflate.h"
 #include "../cursedhelpers.h"
+#include "../crc32/crc32.h"
 
-unsigned int crc32(unsigned int crc, const unsigned char *buf, size_t len) {
-
-  unsigned int i, k;
-  unsigned int _crc = 0xFFFFFFFF & crc;
-
-  for ( i = 0; i < len; i++ )
-  {
-    _crc ^= ( buf[ i ] );
-    for ( k = 8; k; k-- )
-    {
-      _crc = _crc & 1 ? ( _crc >> 1 ) ^ 0xEDB88320 : _crc >> 1;
-    }
-  }
-  return _crc;
-}
-
-unsigned int get_file_crc_fptr_fsz(const char* filename,FILE** f_out,size_t* size_out){
+uint32_t get_file_crc_fptr_fsz(const char* filename,FILE** f_out,size_t* size_out){
     LOG_I("Calculating CRC32 for file: %s\n", filename);
     *f_out = fopen(filename,"rb");
     if(!*f_out){LOG_E("File ptr closed without warning!\n");};
-    unsigned char buf[4096];
+    uint8_t buf[4096];
     size_t read;
     size_t total =0;
-    unsigned int crc = 0xFFFFFFFF;
+    uint32_t crc = 0xFFFFFFFF;
     while((read = fread(buf,1,sizeof(buf),*f_out))>0){
         /*LOG_I("Reading file in chunks to calculate CRC32...%x\n",crc);*/
         crc = crc32(crc,buf,read);
@@ -46,21 +31,21 @@ void make_gzip_header(gzip_header* header) {
     header->os = OS_UNIX;
 }
 
-void make_gzip_footer(gzip_footer* footer, int crc_chksum, size_t size) {
+void make_gzip_footer(gzip_footer* footer, uint32_t crc_chksum, size_t size) {
     footer->crc32 = crc_chksum;
     footer->isize = size & 0xFFFFFFFF; /* only lower 32 bits */
 }
 
-int write_gzip_from_file(const char* filename, bitarray* bData) {
+uint32_t write_gzip_from_file(const char* filename, bitarray* bData) {
     long processed;
     gzip_header header;
     gzip_footer footer;
     FILE* f;
-    unsigned char* fbuffer;
-    unsigned int crc_cs;
+    uint8_t* fbuffer;
+    uint32_t crc_cs;
     size_t file_sz;
     make_gzip_header(&header);
-    packbytes_aligned(bData, (unsigned char*)&header, 10);
+    packbytes_aligned(bData, (uint8_t*)&header, 10);
 
     crc_cs = get_file_crc_fptr_fsz(filename, &f, &file_sz);
     if (!f) {
@@ -85,7 +70,7 @@ int write_gzip_from_file(const char* filename, bitarray* bData) {
         return -1;
     }
     fclose(f);
-    processed = deflate(bData, (unsigned char*)fbuffer, file_sz);
+    processed = deflate(bData, (uint8_t*)fbuffer, file_sz);
     if (processed < 0) {
         LOG_E("Compression failed\n");
         free(fbuffer);
@@ -93,7 +78,7 @@ int write_gzip_from_file(const char* filename, bitarray* bData) {
     }
     bitarray_flush(bData);
     make_gzip_footer(&footer, crc_cs ,file_sz);
-    packbytes_aligned(bData, (unsigned char*)&footer, sizeof(footer));
+    packbytes_aligned(bData, (uint8_t*)&footer, sizeof(footer));
 
     free(fbuffer);
     return bData->used;
