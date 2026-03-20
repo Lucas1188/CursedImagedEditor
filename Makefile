@@ -1,5 +1,6 @@
 CC = gcc
 CFLAGS = -ansi -Werror
+DFLAGS ?=    # default empty if not provided
 
 SRC := $(shell find src -name "*.c")
 LIB := $(shell find lib -name "*.c")
@@ -17,7 +18,7 @@ $(TARGET): $(OBJ)
 
 build/%.o: %.c
 	mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) $(DFLAGS) -c $< -o $@
 
 force: clean all
 
