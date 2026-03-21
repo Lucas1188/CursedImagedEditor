@@ -328,9 +328,6 @@ void limit_code_length(huffcode** code_list, size_t n, size_t maxbits)
     }
 }
 
-
-
-
 void decode_bitstream(huffmancoder* hobj, unsigned char* data, size_t size, fdecode_symbol_fn fdsym)
 {
   int bytepos;
