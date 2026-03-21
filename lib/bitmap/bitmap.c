@@ -14,25 +14,23 @@ static int read_u16_le(FILE* f, uint16_t* out){
 static int read_u32_le(FILE* f, uint32_t* out){
     uint8_t b[4];
     if(fread(b, 1, 4, f) != 4) return 0;
-    *out = (uint32_t)b[0]
-         | ((uint32_t)b[1] << 8)
-         | ((uint32_t)b[2] << 16)
-         | ((uint32_t)b[3] << 24);
+    *out = b[0] | ((uint32_t)b[1] << 8) | ((uint32_t)b[2] << 16) | ((uint32_t)b[3] << 24);
     return 1;
 }
 
 bitmap* read_bitmap(const char* filename){
     FILE*    f;
     uint8_t  sig[2];
-    uint32_t file_size, reserved, pixel_offset;
-    uint32_t dib_size, raw_w, raw_h;
-    uint32_t compression, image_size, xppm, yppm, clrs, iclrs;
-    uint32_t row_stride, out_row, out_idx, in_idx, row;
+    uint32_t pixel_offset, dib_size, raw_w, raw_h, compression, dummy;
+    uint32_t row_stride, row;
     int32_t  width, height;
-    uint16_t u_planes, u_bpp;
+    uint16_t u_bpp, dummy16;
     uint8_t* row_buf;
+    uint8_t* out;
+    uint8_t* in;
     bitmap*  bmp;
-    int      flip, x;
+    uint32_t x;
+    int      flip;
 
     f = fopen(filename, "rb");
     if(!f){
@@ -40,22 +38,22 @@ bitmap* read_bitmap(const char* filename){
         return NULL;
     }
 
-    /* --- File Header (14 bytes) --- */
+    /* File Header (14 bytes) */
     if(fread(sig, 1, 2, f) != 2 || sig[0] != 'B' || sig[1] != 'M'){
         LOG_E("Invalid BMP signature: %s\n", filename);
         fclose(f);
         return NULL;
     }
-    if(!read_u32_le(f, &file_size) ||
-       !read_u32_le(f, &reserved)  ||
+    if(!read_u32_le(f, &dummy)        ||  /* file_size - unused */
+       !read_u32_le(f, &dummy)        ||  /* reserved  - unused */
        !read_u32_le(f, &pixel_offset)){
         LOG_E("Failed to read BMP file header\n");
         fclose(f);
         return NULL;
     }
-    LOG_I("File size: %u  Pixel offset: %u\n", file_size, pixel_offset);
+    LOG_I("Pixel offset: %u\n", pixel_offset);
 
-    /* --- DIB Header (BITMAPINFOHEADER = 40 bytes) --- */
+    /* DIB Header (BITMAPINFOHEADER = 40 bytes) */
     if(!read_u32_le(f, &dib_size)){
         LOG_E("Failed to read DIB header size\n");
         fclose(f);
@@ -66,16 +64,12 @@ bitmap* read_bitmap(const char* filename){
         fclose(f);
         return NULL;
     }
-    if(!read_u32_le(f, &raw_w)      ||
-       !read_u32_le(f, &raw_h)      ||
-       !read_u16_le(f, &u_planes)   ||
-       !read_u16_le(f, &u_bpp)      ||
-       !read_u32_le(f, &compression)||
-       !read_u32_le(f, &image_size) ||
-       !read_u32_le(f, &xppm)       ||
-       !read_u32_le(f, &yppm)       ||
-       !read_u32_le(f, &clrs)       ||
-       !read_u32_le(f, &iclrs)){
+    if(!read_u32_le(f, &raw_w)           ||
+       !read_u32_le(f, &raw_h)           ||
+       !read_u16_le(f, &dummy16)         ||  /* planes - unused */
+       !read_u16_le(f, &u_bpp)           ||
+       !read_u32_le(f, &compression)     ||
+       fseek(f, 20, SEEK_CUR) != 0){         /* skip: image_size, xppm, yppm, clrs, iclrs */
         LOG_E("Failed to read DIB header fields\n");
         fclose(f);
         return NULL;
@@ -97,12 +91,9 @@ bitmap* read_bitmap(const char* filename){
         return NULL;
     }
 
-    /* Negative height means the image is already top-down, no flip needed */
-    flip = 1;
-    if(height < 0){
-        height = -height;
-        flip   = 0;
-    }
+    /* Negative height = top-down, no flip needed */
+    flip = (height > 0);
+    if(height < 0) height = -height;
 
     /* Seek to pixel data (skips color table and any extra DIB header bytes) */
     if(fseek(f, (long)pixel_offset, SEEK_SET) != 0){
@@ -112,11 +103,7 @@ bitmap* read_bitmap(const char* filename){
     }
 
     /* BMP rows are padded to a 4-byte boundary */
-    if(u_bpp == 32){
-        row_stride = (uint32_t)width * 4;
-    }else{
-        row_stride = ((uint32_t)width * 3 + 3) & ~3u;
-    }
+    row_stride = (u_bpp == 32) ? (uint32_t)width * 4 : (((uint32_t)width * 3 + 3) & ~3u);
 
     row_buf = (uint8_t*)malloc(row_stride);
     if(!row_buf){
@@ -146,10 +133,8 @@ bitmap* read_bitmap(const char* filename){
     }
 
     /*
-        Read each row from the file.
         BMP stores BGR (24-bit) or BGRA (32-bit) — we output RGBA.
-        When flip=1, row 0 in the file is the bottom row of the image,
-        so we write it into the last row of the output buffer.
+        flip=1: row 0 in file is the bottom row, write rows in reverse.
     */
     for(row = 0; row < bmp->height; row++){
         if(fread(row_buf, 1, row_stride, f) != row_stride){
@@ -161,23 +146,11 @@ bitmap* read_bitmap(const char* filename){
             return NULL;
         }
 
-        out_row = flip ? (bmp->height - 1 - row) : row;
-
-        for(x = 0; x < (int)bmp->width; x++){
-            out_idx = (out_row * bmp->width + (uint32_t)x) * 4;
-            if(u_bpp == 32){
-                in_idx = (uint32_t)x * 4;
-                bmp->pixels[out_idx + 0] = row_buf[in_idx + 2]; /* R */
-                bmp->pixels[out_idx + 1] = row_buf[in_idx + 1]; /* G */
-                bmp->pixels[out_idx + 2] = row_buf[in_idx + 0]; /* B */
-                bmp->pixels[out_idx + 3] = row_buf[in_idx + 3]; /* A */
-            }else{
-                in_idx = (uint32_t)x * 3;
-                bmp->pixels[out_idx + 0] = row_buf[in_idx + 2]; /* R */
-                bmp->pixels[out_idx + 1] = row_buf[in_idx + 1]; /* G */
-                bmp->pixels[out_idx + 2] = row_buf[in_idx + 0]; /* B */
-                bmp->pixels[out_idx + 3] = 0xFF;                /* A = opaque */
-            }
+        out = bmp->pixels + (flip ? bmp->height - 1 - row : row) * bmp->width * 4;
+        in  = row_buf;
+        for(x = 0; x < bmp->width; x++, out += 4, in += u_bpp / 8){
+            out[0] = in[2]; out[1] = in[1]; out[2] = in[0];
+            out[3] = (u_bpp == 32) ? in[3] : 0xFF;
         }
     }
 
