@@ -249,7 +249,9 @@ typedef struct{
     directly.  If PLTE is not present, such a viewer will need to
     select colors on its own, but it is often preferable for this
 */
-
+typedef struct{
+    /*Dont need this now*/
+}plte_chunk;
 /*
     +---------------+
     |   IDAT CHUNK  |
@@ -296,13 +298,18 @@ typedef struct{
     
 }idat_chunk;
 
+typedef struct{
+
+}iend_chunk;
+
+#define PNG_MAGIC {137, 80, 78, 71, 13, 10, 26, 10};
 
 typedef struct{
     
-    const uint8_t MAGIC [8] = {
-        137, 80, 78, 71, 13, 10, 26, 10
-    };
+    const uint8_t MAGIC [8];
 
+    ihdr_chunk* pihdr_chunk;
+    idat_chunk* pidat_chunks;
     
-
 }png_format;
+
