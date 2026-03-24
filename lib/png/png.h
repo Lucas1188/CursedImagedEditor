@@ -291,25 +291,57 @@ typedef struct{
 */
 
 typedef struct{
-    
-    uint64_t size;                          /*Not to be written*/
-
     uint8_t* data;
-    
 }idat_chunk;
 
-typedef struct{
-
-}iend_chunk;
+typedef uint32_t iend_chunk;
 
 #define PNG_MAGIC {137, 80, 78, 71, 13, 10, 26, 10};
+#define IEND_ID {0x49, 0x45, 0x4E, 0x44}
+#define IDAT_ID {0x49, 0x44, 0x41, 0x54}
+#define PLTE_ID {0x50, 0x4C, 0x54, 0x45}
+#define IHDR_ID {0x49, 0x48, 0x44, 0x52}
 
 typedef struct{
     
     const uint8_t MAGIC [8];
+    ihdr_chunk pihdr_chunk;
+    idat_chunk** pidat_chunks;
+    iend_chunk piend;
 
-    ihdr_chunk* pihdr_chunk;
-    idat_chunk* pidat_chunks;
-    
 }png_format;
 
+#define IHDR_GEN(w,h,comp,bd,ct)\
+    (ihdr_chunk){ \
+        .width = (w), \
+        .height = (h), \
+        .bit_depth = (bd), \
+        .color_type = (ct),       \
+        .compression_method = (comp), \
+        .filter_method = FILTER_NONE, \
+        .interlace_method = INTERLACE_NONE \
+    }
+
+#define IHDR_TRUECOLOR8_A8(w, h, comp) \
+    IHDR_GEN(w,h,comp,8,CT_RGB_ALPHA)
+
+#define IHDR_TRUECOLOR16_A16(w, h, comp) \
+    IHDR_GEN(w,h,comp,16,CT_RGB_ALPHA)
+
+#define IHDR_TRUECOLOR8(w, h, comp) \
+    IHDR_GEN(w,h,comp,8,CT_RGB)
+
+#define IHDR_TRUECOLOR16(w, h, comp) \
+    IHDR_GEN(w,h,comp,16,CT_RGB)
+
+#define IHDR_GRAYSCALE8(w, h, comp) \
+    IHDR_GEN(w,h,comp,8,CT_GRAYSCALE)
+
+#define IHDR_GRAYSCALE16(w, h, comp) \  
+    IHDR_GEN(w,h,comp,16,CT_GRAYSCALE)
+
+#define IHDR_GRAYSCALE8_A8(w, h, comp) \
+    IHDR_GEN(w,h,comp,8,CT_GRAY_ALPHA)
+
+#define IHDR_GRAYSCALE16_A16(w, h, comp) \
+    IHDR_GEN(w,h,comp,16,CT_GRAY_ALPHA)
