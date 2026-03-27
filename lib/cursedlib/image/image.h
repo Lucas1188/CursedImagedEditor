@@ -32,6 +32,12 @@ typedef uint64_t tcursed_pix;
 
 void make_spixel_fmt(const spixel_fmt_info* pixel_info, spixel_fmt* px_fmtout);
 
-#define CURSED_RGBA64_PXFMT()do {}while(0);
+#define SCOLOR_FMT(sz_, offset_) { (sz_), (offset_) }
+
+#define CURSED_RGBA64_PXFMT(px_fmtout)                                                                                      \
+    do {                                                                                                                    \
+        spixel_fmt_info sfi = {SCOLOR_FMT(16,48), SCOLOR_FMT(16,32),SCOLOR_FMT(16,16),SCOLOR_FMT(16,0),SCOLOR_FMT(0,0)};    \
+        make_spixel_fmt(&sfi,px_fmtout);                                                                                    \
+    }while(0);                                                                                                              \
 
 #endif

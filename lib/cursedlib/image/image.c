@@ -12,6 +12,12 @@ void make_spixel_fmt(const spixel_fmt_info* pixel_info, spixel_fmt* px_fmtout){
     px_fmtout->maskG = ((pixel_info->G.sz<<1)-1)<<pixel_info->G.bit_offset;
     px_fmtout->maskB = ((pixel_info->B.sz<<1)-1)<<pixel_info->B.bit_offset;
     px_fmtout->maskA = ((pixel_info->A.sz<<1)-1)<<pixel_info->A.bit_offset;
-    memcpy(&px_fmtout->info,pixel_info,sizeof(spixel_fmt_info));
-    
+    memcpy(&px_fmtout->info,pixel_info,sizeof(spixel_fmt_info));    
 }
+
+#ifdef STANDALONE_CURSEDIMAGE
+int main(int argv, char** argc){
+    
+    return 0;
+}
+#endif
