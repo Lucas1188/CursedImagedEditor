@@ -78,6 +78,10 @@ void limit_code_length(huffcode** code_list, size_t sz,size_t maxbits);
 
 void make_deflate_codes(huffcode** code_list, size_t sz,int maxbits);
 
+void create_table(huffmancoder* hobj,huffnode** nodes,int stack_sz,int limit_len);
+
+int dump_codelens(uint16_t* buffer,huffmancoder* hobj,const int stack_sz);
+
 /*return 1 if EOB else 0*/
 typedef int (*fdecode_symbol_fn)(short symbol, unsigned char* data, int* bitpos, int* bytepos);
 

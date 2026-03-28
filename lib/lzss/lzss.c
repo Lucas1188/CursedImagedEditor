@@ -6,6 +6,7 @@ void emit_pointer(slzss_pointer* sp, uint64_t pos, uint16_t match_len, uint16_t 
   sp->position = pos;
   sp->length = match_len;
   sp->distance = dist;
+  LOG_V("LZPTR: %ld %ld %ld\n",sp->position,sp->length,sp->distance);
   /*
   printf("LZPTR: %ld %ld %ld\n",sp->position,sp->length,sp->distance);
   */
@@ -23,38 +24,57 @@ void insert_hash(const uint8_t* window, long int pos) {
     head[h] = pos;
 }
 
-int find_match(const uint8_t* window, long int pos, int maxlen, int *best_dist)
+int find_match(const uint8_t* window, size_t input_size,
+               size_t pos, int maxlen, int *best_dist)
 {
-    int len, cur, next,best_len = 0;
-    int limit = (pos > WINDOW_SIZE) ? pos - WINDOW_SIZE : 0;
+    int len, best_len = 0;
+    int next;
     int chain = LOOKAHEAD_SIZE;
-    unsigned int h = hash3((const uint8_t*)(window + pos));
-    cur = head[h];
-    while (cur >= limit && chain--)
-    {
-      if (cur >= pos)
-        break;   /*cannot match future/self*/
 
-      if (window[cur] == window[pos]) {
-        len = 0;
-        while (len < maxlen && window[cur + len] == window[pos + len]){
-          len++;
+    size_t limit = (pos > WINDOW_SIZE) ? pos - WINDOW_SIZE : 0;
+
+    /* prevent hash OOB */
+    if (pos + 2 >= input_size)
+        return 0;
+
+    unsigned int h = hash3(window + pos);
+    int cur = head[h];
+
+    while (cur >= 0 && (size_t)cur >= limit && chain--)
+    {
+        if ((size_t)cur >= pos)
+            break;
+
+        if (window[cur] == window[pos]) {
+            len = 0;
+
+            while (len < maxlen &&
+                   pos + len < input_size &&
+                   (size_t)cur + len < input_size &&
+                   window[cur + len] == window[pos + len]) {
+                len++;
+            }
+
+            if (len > best_len){
+                best_len = len;
+                *best_dist = (int)(pos - (size_t)cur);
+            }
+
+            if (best_len >= maxlen)
+                break;
         }
-        if (len > best_len){
-          best_len = len;
-          *best_dist = pos - cur;
-        }
-        if (best_len >= maxlen)
-          break;
-      }
-      next = prev[cur & (WINDOW_SIZE - 1)];
-      if (next >= cur)   
-          break;
-      cur = next;
+
+        next = prev[cur & (WINDOW_SIZE - 1)];
+
+        if (next >= cur)
+            break;
+
+        cur = next;
     }
 
     return best_len;
 }
+
 /*return ptr count*/
 int generate_lzss_pointers(uint8_t* input,long int input_size,slzss_pointer* lzss_ptrs,int ptr_n,long int* data_cnt,
                             f_on_emit_lzss_ptr fn_olptr,
@@ -66,14 +86,14 @@ int generate_lzss_pointers(uint8_t* input,long int input_size,slzss_pointer* lzs
   uint16_t symbol;
   uint8_t* s;
   ptr_count = 0;
-  for(pos = 0; pos < input_size /*- MIN_MATCH*/; pos++){
+  for(pos = 0; pos < (input_size - MIN_MATCH); pos++){
     dist = 0;
     remaining = input_size - pos;
     maxlen = remaining < LOOKAHEAD_SIZE ? remaining : LOOKAHEAD_SIZE;
-    match_len = find_match(input, pos, maxlen, &dist);
+    match_len = find_match(input, input_size, pos, maxlen, &dist);
     if(match_len >= MIN_MATCH){
 
-        LOG_I("<%d,%d> \n",match_len,dist);
+        /*LOG_I("<%d,%d> \n",match_len,dist);*/
         emit_pointer(&lzss_ptrs[ptr_count++], pos, (uint16_t)match_len, (uint16_t)dist);
         
 

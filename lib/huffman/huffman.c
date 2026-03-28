@@ -249,11 +249,162 @@ void generate_codes(huffnode* cnode,huffcode** code_list,uint16_t clen,uint16_t 
 
 #define MAX_CODELEN 64  /* safe upper bound*/
 
+void print_kraft(huffcode** code_list, size_t n)
+{
+    int bl_count[MAX_CODELEN] = {0};
+    size_t i;
+    int bits;
+    int truemax = 0;
+    for (i = 0; i < n; i++) {
+        int len = code_list[i]->codelen;
+        bl_count[len]++;
+        if (len > truemax) truemax = len;
+    }
+
+    unsigned long long kraft = 0;
+    printf("Code length counts:\n");
+    for (bits = 1; bits <= truemax; bits++) {
+        if (bl_count[bits] > 0)
+            printf("len=%2d count=%3d\n", bits, bl_count[bits]);
+        kraft += ((unsigned long long)bl_count[bits]) << (truemax  - bits);
+    }
+
+    unsigned long long target = 1ULL << truemax;
+    printf("Kraft sum = %llu / %llu  => %s\n", kraft, target,
+           kraft <= target ? "OK" : "OVERSUBSCRIBED");
+}
+
+void print_kraft_overflow(huffcode** code_list, size_t n, int maxbits)
+{
+    int bl_count[MAX_CODELEN] = {0};
+    size_t i;
+
+    for (i = 0; i < n; i++) {
+        int len = code_list[i]->codelen;
+        if (len >= MAX_CODELEN) len = MAX_CODELEN - 1;
+        if (len < 1) len = 1;
+        bl_count[len]++;
+    }
+
+    int overflow = 0;
+    for (i = maxbits + 1; i < MAX_CODELEN; i++)
+        overflow += bl_count[i];
+
+    while (overflow > 0) {
+        int bits = maxbits - 1;
+        while (bits > 0 && bl_count[bits] == 0)
+            bits--;
+
+        if (bits == 0) break; 
+
+        bl_count[bits]--;
+        bl_count[bits + 1] += 2;
+        overflow--;
+    }
+
+    for (i = maxbits + 1; i < MAX_CODELEN; i++)
+        bl_count[i] = 0;
+
+    unsigned long long kraft = 0;
+    unsigned long long target = 1ULL << maxbits;
+
+    printf("Code length counts after overflow redistribution:\n");
+    for (i = 1; i <= maxbits; i++) {
+        if (bl_count[i] > 0)
+            printf("len=%2zu count=%3d\n", i, bl_count[i]);
+        kraft += ((unsigned long long)bl_count[i]) << (maxbits - i);
+    }
+
+    printf("Kraft sum = %llu / %llu => %s\n",
+           kraft, target, (kraft <= target) ? "OK" : "OVERSUBSCRIBED");
+}
+void limit_code_length(huffcode** code_list, size_t n, size_t maxbits)
+{
+    int bl_count[MAX_CODELEN];
+    unsigned long total = 0;
+    unsigned long max_weight;
+    size_t i;
+    int len, bits, count;
+    size_t idx;
+
+    /* Initialize bl_count array */
+    for (i = 0; i < MAX_CODELEN; i++) {
+        bl_count[i] = 0;
+    }
+
+    /* 1. Initial Capping & Weight Calculation */
+    for (i = 0; i < n; i++) {
+        if (code_list[i]->codelen > (unsigned short)maxbits) {
+            code_list[i]->codelen = (unsigned short)maxbits;
+        }
+        bl_count[code_list[i]->codelen]++;
+    }
+
+    for (len = 1; len <= (int)maxbits; len++) {
+        total += ((unsigned long)bl_count[len] << (maxbits - len));
+    }
+
+    max_weight = 1UL << maxbits;
+
+    /* 2. Adjust if overfull: Move nodes deeper (increase length) 
+       This reduces total weight because 2^(-(L+1)) < 2^(-L) */
+    while (total > max_weight) {
+        /* Find the shortest code to push down */
+        for (bits = (int)maxbits - 1; bits > 0; bits--) {
+            if (bl_count[bits] > 0) {
+                bl_count[bits]--;
+                bl_count[bits + 1]++;
+                
+                /* Weight change: We lose 2^(max-bits), gain 2^(max-(bits+1))
+                   Result: total -= 2^(max-bits-1) */
+                total -= (1UL << (maxbits - bits - 1));
+                break;
+            }
+        }
+    }
+
+    /* 3. Adjust if underfull: Move nodes up (decrease length)
+       Required for canonical Huffman to ensure no "holes" in the prefix space */
+    while (total < max_weight) {
+        /* Find the deepest code to pull up */
+        for (bits = (int)maxbits; bits > 1; bits--) {
+            if (bl_count[bits] > 0) {
+                /* Check if pulling up fits in max_weight */
+                unsigned long weight_gain = (1UL << (maxbits - bits + 1)) - (1UL << (maxbits - bits));
+                /* Simplifies to: 1UL << (maxbits - bits) */
+                
+                if (total + (1UL << (maxbits - bits)) <= max_weight) {
+                    bl_count[bits]--;
+                    bl_count[bits - 1]++;
+                    total += (1UL << (maxbits - bits));
+                    break;
+                }
+            }
+        }
+        /* If no more moves possible, break to avoid infinite loop */
+        if (bits <= 1) break; 
+    }
+
+    /* 4. Assign lengths back to sorted list (Freq ASC)
+       Smallest frequencies (index 0) get the longest codes (maxbits) */
+    idx = 0;
+    for (len = (int)maxbits; len >= 1; len--) {
+        count = bl_count[len];
+        while (count > 0 && idx < n) {
+            code_list[idx++]->codelen = (unsigned short)len;
+            count--;
+        }
+    }
+}
+/*
 void limit_code_length(huffcode** code_list, size_t n, size_t maxbits)
 {
     size_t i;
 
     int bl_count[MAX_CODELEN] = {0};
+    LOG_I("Kraft before limiting:\n");
+    print_kraft(code_list, n);
+
     for (i = 0; i < n; i++) {
         int len = code_list[i]->codelen;
         if (len >= MAX_CODELEN) len = MAX_CODELEN - 1;
@@ -264,28 +415,24 @@ void limit_code_length(huffcode** code_list, size_t n, size_t maxbits)
     for (i = maxbits + 1; i < MAX_CODELEN; i++) {
         overflow += bl_count[i];
     }
-
+    
     while (overflow > 0) {
         int bits = maxbits - 1;
-
-        /* find largest available shorter length */
         while (bits > 0 && bl_count[bits] == 0)
             bits--;
 
         if (bits == 0) break;
 
-        /* split one node */
         bl_count[bits]--;
         bl_count[bits + 1] += 2;
 
         overflow--;
     }
+   
 
     for (i = maxbits + 1; i < MAX_CODELEN; i++) {
         bl_count[i] = 0;
     }
-
-    /* enforce Kraft equality    */
 
     int left = 1 << maxbits;
 
@@ -295,8 +442,6 @@ void limit_code_length(huffcode** code_list, size_t n, size_t maxbits)
 
     while (left > 0) {
         int bits;
-
-        /* find longest code to shorten */
         for (bits = maxbits; bits > 1; bits--) {
             if (bl_count[bits] > 0) {
                 bl_count[bits]--;
@@ -309,9 +454,6 @@ void limit_code_length(huffcode** code_list, size_t n, size_t maxbits)
 
         if (bits == 1) break;
     }
-
-    /* assign back excess lengths */
-
     size_t idx = 0;
     int len, count;
 
@@ -326,8 +468,10 @@ void limit_code_length(huffcode** code_list, size_t n, size_t maxbits)
     if (idx != n) {
         LOG_E("Mismatch after limiting: idx=%ld, n=%ld\n", idx, n);
     }
+    LOG_I("Kraft after limiting:\n");
+    print_kraft(code_list, n);
 }
-
+*/
 void decode_bitstream(huffmancoder* hobj, unsigned char* data, size_t size, fdecode_symbol_fn fdsym)
 {
   int bytepos;
@@ -401,7 +545,7 @@ void create_table(huffmancoder* hobj,huffnode** nodes,int stack_sz,int limit_len
 
   LOG_I(" Ok\n\nSort (Length|Symbol) ASC:\n");
 
-  insertion_sort_xxB((char**)hobj->codetable, HC_CLEN_OFFSET, HC_SYM_OFFSET, HC_CLEN_SIZE, HC_SYM_SIZE, HUFFMAN_ALPHABET_SZ, 0);
+  insertion_sort_xxB((char**)hobj->codetable, HC_FREQ_OFFSET, HC_SYM_OFFSET, HC_FREQ_SIZE, HC_SYM_SIZE, HUFFMAN_ALPHABET_SZ, 0);
   
   print_codes(hobj->codetable,hobj->distinct);
   
