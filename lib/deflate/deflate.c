@@ -219,9 +219,7 @@ int rle_codelens(const uint16_t *codelens,
 
 void count_literals(uint16_t symbol){
   huffmancoder* literalcodes= global_codingtable[0];
-  /*if(symbol>=LCODEBASE){
-    symbol = LCODEBASE+LENCODE_LOOKUP[symbol-LCODEBASE];
-  }*/
+  
   long* r = &(literalcodes->freq[symbol]); 
   if(*r==0){
     literalcodes->table[symbol]=literalcodes->distinct;
@@ -286,6 +284,10 @@ int deflate(bitarray* bBuffer, uint8_t* data,size_t input_sz){
     global_codingtable[0] = &o_huffman;  
     global_codingtable[1] = &d_huffman;
     global_codingtable[2] = &cl_huffman;
+    
+    memset(cnodes,0,sizeof(cnodes));
+    memset(dnodes,0,sizeof(dnodes));
+    memset(clnodes,0,sizeof(clnodes));
     
     global_nodes[0] = cnodes;
     global_nodes[1] = dnodes;

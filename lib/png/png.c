@@ -223,12 +223,15 @@ int main(int argv, char** argc){
     LOG_I("PNG written to out.png\n");
 
     /* cleanup */
+    free(p.pihdr.CHUNK_DATA);
     free(raw_px);
     for (j = 0; j < p.n_idatchunks; j++) {
         free(p.pidat_chunks[j]->CHUNK_DATA);
         free(p.pidat_chunks[j]);
+        free(idat_c_ptrs[j]);
     }
     free(p.pidat_chunks);
+    free(idat_c_ptrs);
 
     return 0;
 
