@@ -258,7 +258,8 @@ void count_ldcodes(uint16_t length, uint16_t distance){
 int deflate(bitarray* bBuffer, uint8_t* data,size_t input_sz){
 
     uint8_t* input,distance_codes[WINDOW_SIZE];
-    int i,j,min,f,offset,offset1,pos,dist,match_len,ptr_count,next_ptr,next_pos,input_size;
+    int i,j,min,f,offset,offset1,dist,match_len,ptr_count,next_ptr,next_pos;
+    long int pos,input_size;
     long *r;
     uint16_t codetable[HUFFMAN_ALPHABET_SZ],sym,lcode;
     huffnode* cnodes[HUFFMAN_ALPHABET_SZ],*dnodes[29],*clnodes[18];
@@ -291,14 +292,14 @@ int deflate(bitarray* bBuffer, uint8_t* data,size_t input_sz){
     global_nodes[2] = clnodes;
     
     global_distancecodes[0] = distance_codes;
-    LOG_I("LZSS portion inputsize: %d\n",input_size);
+    LOG_I("LZSS portion inputsize: %ld\n",input_size);
     ptr_count = generate_lzss_pointers(input,input_size,lzss_ptrs,WINDOW_SIZE,&pos,count_ldcodes,count_literals); 
     /*Stops processing if we run out of ptr space in the stack*/
     count_literals(EOBCODE);
     
-    LOG_I("\nTotal ptrs: %d ->%d\n",ptr_count,pos);
+    LOG_I("\nTotal ptrs: %d ->%ld\n",ptr_count,pos);
     
-    LOG_I("Parsed %d %d symbols\n",pos,o_huffman.distinct);
+    LOG_I("Parsed %ld %d symbols\n",pos,o_huffman.distinct);
     create_table(&o_huffman,cnodes,HUFFMAN_ALPHABET_SZ,15);
     create_table(&d_huffman,dnodes,30,15);
     

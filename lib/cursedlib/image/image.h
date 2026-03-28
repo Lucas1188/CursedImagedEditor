@@ -2,6 +2,8 @@
 #define CURSEDIMAGE_H
 
 #include <stdint.h>
+#include <stddef.h>
+#include <stdlib.h>
 
 typedef struct{
 
@@ -34,12 +36,12 @@ typedef struct{
     size_t height;
     size_t width;
     spixel_fmt px_fmt;
-    tcursed_pix* pxs; 
+    tcursed_pix* pxs;
 }cursed_img;
 
 #define SCOLOR_FMT(sz_, offset_)(scolor_fmt) {.sz=(sz_),.bit_offset= (offset_) }
 
-#define CURSED_RGBA64_PXFMT (spixel_fmt){                                                                               \
+#define CURSED_RGBA64_PXFMT {                                                                               \
     .info=(spixel_fmt_info){SCOLOR_FMT(16,48), SCOLOR_FMT(16,32),SCOLOR_FMT(16,16),SCOLOR_FMT(16,0),SCOLOR_FMT(0,0)},   \
     .maskR = 0xFFFF000000000000,                                                                                        \
     .maskG = 0x0000FFFF00000000,                                                                                        \
@@ -49,6 +51,17 @@ typedef struct{
 }                                                                        
 
 
+#define GEN_CURSED_IMG(w,h) \
+    ((cursed_img){ \
+        .height = (h), \
+        .width = (w), \
+        .px_fmt = CURSED_RGBA64_PXFMT, \
+        .pxs = malloc((w)*(h)*sizeof(tcursed_pix)) \
+    })
 
+#define RELEASE_CURSED_IMG(img) do { \
+    free((img).pxs); \
+    (img).pxs = NULL; \
+} while(0)
 
 #endif

@@ -1,7 +1,6 @@
 #ifndef CURSEDHELPERS_H
 #define CURSEDHELPERS_H
 #include <stdio.h>
-
 extern void print_binary(int code,int len);
 
 #ifdef DEBUG
@@ -12,7 +11,7 @@ extern void print_binary(int code,int len);
 #if defined(VERBOSE) || defined(DEBUG)
   #define LOG_V(fmt, ...) do { printf(fmt, ##__VA_ARGS__); } while(0)
 #else
-  #define LOG_I(fmt, ...) do {} while(0)
+  #define LOG_V(fmt, ...) do {} while(0)
 #endif
 
 #ifdef DEBUG
