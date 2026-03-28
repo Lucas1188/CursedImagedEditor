@@ -6,8 +6,10 @@ typedef int64_t (* write_filter)(const uint8_t* row, uint8_t* prev_row, uint8_t*
 int64_t none_func(const uint8_t* row, uint8_t* prev_row, uint8_t* wBuffer,const size_t scanline_sz,const size_t pix_sz){
     int i;
     int64_t sum =0;
+    wBuffer[0] = FILTER_NONE;
     for(i=0;i<scanline_sz;i++){
         sum += row[i];
+        wBuffer[i+1] = row[i];
     }
     return sum; 
 }
@@ -18,7 +20,7 @@ int64_t sub_func(const uint8_t* row, uint8_t* prev_row, uint8_t* wBuffer, const 
     int64_t sum = 0;
     uint8_t left;
 
-    wBuffer[0] = 1; /* FILTER_SUB */
+    wBuffer[0] = FILTER_SUB; /* FILTER_SUB */
     for(i = 0; i < scanline_sz; i++) {
         left = GET_LEFT(row, i, pix_sz);
         wBuffer[i + 1] = (uint8_t)(row[i] - left);
@@ -32,7 +34,7 @@ int64_t avg_func(const uint8_t* row, uint8_t* prev_row, uint8_t* wBuffer, const 
     int64_t sum = 0;
     uint8_t left, up;
 
-    wBuffer[0] = 3; /* FILTER_AVERAGE */
+    wBuffer[0] = FILTER_AVERAGE; /* FILTER_AVERAGE */
     for(i = 0; i < scanline_sz; i++) {
         left = GET_LEFT(row, i, pix_sz);
         up = prev_row[i];
@@ -74,7 +76,7 @@ int64_t paeth_func(const uint8_t* row, uint8_t* prev_row, uint8_t* wBuffer, cons
     int64_t sum = 0;
     uint8_t a, b, c;
 
-    wBuffer[0] = 4; /* FILTER_PAETH */
+    wBuffer[0] = FILTER_PAETH; /* FILTER_PAETH */
     for(i = 0; i < scanline_sz; i++) {
         a = GET_LEFT(row, i, pix_sz);      /* Left */
         b = prev_row[i];                   /* Up */
@@ -98,7 +100,6 @@ const write_filter filter_funcs[5] = {
 uint8_t* filter_row(const uint8_t* row, uint8_t* prev_row, uint8_t* wBuffer, const size_t scanline_sz,const size_t pix_sz){
     int i,j,sum,min_fil,nsum;
     uint8_t* tmp;
-    
     min_fil = 0;
     sum = filter_funcs[FILTER_NONE](row,prev_row,wBuffer,scanline_sz,pix_sz);
     for(i = FILTER_NONE+1;i<=FILTER_PAETH;i++){

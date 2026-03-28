@@ -75,7 +75,7 @@ int make_idat_chunks(const ihdr_chunk* header, const uint8_t* rawpx, const size_
     size_t row = 0, scanline_sz = header->width,nchunk=1,deflatedat,wdat=0,tidat;
     uint8_t *prow,*dd,*ad;
     uint8_t* upperpad_ = calloc(header->width*pxsz,1);
-    uint8_t* write_b = calloc(header->height*(header->width+1)*pxsz,1);
+    uint8_t* write_b = calloc(header->height*(header->width*pxsz+1),1);
     int i=0;
     bitarray cba;
     idat_chunk* current_chunk;
@@ -84,11 +84,11 @@ int make_idat_chunks(const ihdr_chunk* header, const uint8_t* rawpx, const size_
     LOG_I("Creating rows witn %d pixels width=%d\n", header->width * header->height, header->width);
     for(;row<header->height;row++){
         LOG_I("Row %ld\n",row);
-        filter_row(&rawpx[row*header->width],prow,dd,header->width,pxsz);
+        filter_row(&rawpx[row*header->width],prow,dd,header->width*pxsz,pxsz);
         prow = dd+1;
-        dd = dd+(header->width+1);
+        dd = dd+(header->width*pxsz+1);
     }
-    deflatedat = (header->height)*(header->width+1)*pxsz;
+    deflatedat = (header->height)*(header->width*pxsz+1);
     tidat = deflatedat;
     LOG_I("Create ZLIB Header\n");
     memset(&cba,0,sizeof(bitarray));
@@ -137,7 +137,7 @@ int make_idat_chunks(const ihdr_chunk* header, const uint8_t* rawpx, const size_
     LOG_I("AD32: %x\n",ad32);
     packbytes_aligned(&cba,(uint8_t*)&ad32,sizeof(ad32));
     current_chunk->sz = cba.used;
-    
+
     free(upperpad_);
     free(write_b);
     return nchunk-1;
@@ -187,7 +187,11 @@ int main(int argv, char** argc){
     raw_px = (uint8_t*)px;
     LOG_I("Calloc Raw bytes\n");
     for(i=0;i<h*w;i++){
-        px[i*4] = 1<<15;
+            /* Indexing: [R, G, B, A]*/
+        px[i*4]     = bswap16(0xFFFF); /* Red*/           
+        px[i*4 + 1] = 0;               /* Green*/
+        px[i*4 + 2] = 0;               /* Blue*/
+        px[i*4 + 3] = bswap16(0xFFFF); /* Alpha (MUST be set to see the color)*/
     }
     LOG_I("Creating Header\n");
     ihdrc = IHDR_TRUECOLOR16_A16(h,w);
