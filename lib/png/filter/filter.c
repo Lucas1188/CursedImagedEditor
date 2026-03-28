@@ -5,50 +5,51 @@ typedef int64_t (* write_filter)(const uint8_t* row, uint8_t* prev_row, uint8_t*
 
 int64_t none_func(const uint8_t* row, uint8_t* prev_row, uint8_t* wBuffer,const size_t scanline_sz,const size_t pix_sz){
     int i;
-    int64_t sum;
+    int64_t sum =0;
     for(i=0;i<scanline_sz;i++){
         sum += row[i];
     }
     return sum; 
 }
-int64_t sub_func(const uint8_t* row, uint8_t* prev_row, uint8_t* wBuffer,const size_t scanline_sz,const size_t pix_sz){
-    int i;
-    int64_t sum;
-    uint8_t* refByte;
-    uint64_t leftpad =0;
-    wBuffer[0] = FILTER_SUB;
-    refByte = &((uint8_t*)&leftpad)[8-pix_sz];
-    for(i=0;i<scanline_sz;i++){
-        wBuffer[i+1] = row[i] - *refByte;
-        sum += wBuffer[i+1];
-        refByte++;
+#define GET_LEFT(arr, i, px) ((i) < (px) ? 0 : (arr)[(i) - (px)])
+
+int64_t sub_func(const uint8_t* row, uint8_t* prev_row, uint8_t* wBuffer, const size_t scanline_sz, const size_t pix_sz) {
+    size_t i;
+    int64_t sum = 0;
+    uint8_t left;
+
+    wBuffer[0] = 1; /* FILTER_SUB */
+    for(i = 0; i < scanline_sz; i++) {
+        left = GET_LEFT(row, i, pix_sz);
+        wBuffer[i + 1] = (uint8_t)(row[i] - left);
+        sum += abs((int8_t)wBuffer[i + 1]); /* PNG heuristic usually uses absolute sum */
     }
-    return sum; 
+    return sum;
+}
+
+int64_t avg_func(const uint8_t* row, uint8_t* prev_row, uint8_t* wBuffer, const size_t scanline_sz, const size_t pix_sz) {
+    size_t i;
+    int64_t sum = 0;
+    uint8_t left, up;
+
+    wBuffer[0] = 3; /* FILTER_AVERAGE */
+    for(i = 0; i < scanline_sz; i++) {
+        left = GET_LEFT(row, i, pix_sz);
+        up = prev_row[i];
+        wBuffer[i + 1] = (uint8_t)(row[i] - ((left + up) >> 1));
+        sum += abs((int8_t)wBuffer[i + 1]);
+    }
+    return sum;
 }
 int64_t up_func(const uint8_t* row, uint8_t* prev_row, uint8_t* wBuffer,const size_t scanline_sz,const size_t pix_sz){
     int i;
-    int64_t sum;
+    int64_t sum =0;
     uint8_t* refByte;
     uint64_t leftpad =0;
     wBuffer[0] = FILTER_UP;
     for(i=0;i<scanline_sz;i++){
         wBuffer[i+1] = row[i] - prev_row[i];
         sum += wBuffer[i+1];
-    }
-    return sum; 
-}
-
-int64_t avg_func(const uint8_t* row, uint8_t* prev_row, uint8_t* wBuffer,const size_t scanline_sz,const size_t pix_sz){
-    int i;
-    int64_t sum;
-    uint8_t* refByte;
-    uint64_t leftpad =0;
-    wBuffer[0] = FILTER_AVERAGE;
-    refByte = &((uint8_t*)&prev_row)[8-pix_sz];
-    for(i=0;i<scanline_sz;i++){
-        wBuffer[i+1] = row[i] - (((uint16_t)*refByte+(uint16_t)prev_row[i])>>1);
-        sum += wBuffer[i+1];
-        refByte++;
     }
     return sum; 
 }
@@ -68,22 +69,24 @@ uint8_t* paeth_pred(uint8_t* a,uint8_t* b,uint8_t* c){
     return c;
 }
 
-int64_t paeth_func(const uint8_t* row, uint8_t* prev_row, uint8_t* wBuffer,const size_t scanline_sz,const size_t pix_sz){
-    int i;
-    int64_t sum;
-    uint8_t* refByte,*prevByte,*pRefByte;
-    uint64_t leftpad =0;
-    wBuffer[0] = FILTER_PAETH;
-    refByte = &((uint8_t*)&prev_row)[8-pix_sz];
+int64_t paeth_func(const uint8_t* row, uint8_t* prev_row, uint8_t* wBuffer, const size_t scanline_sz, const size_t pix_sz) {
+    size_t i;
+    int64_t sum = 0;
+    uint8_t a, b, c;
 
-    for(i=0;i<scanline_sz;i++){
-        pRefByte = i<pix_sz? (uint8_t*)&leftpad:&prev_row[i-pix_sz];
-        wBuffer[i+1] = row[i] - *paeth_pred(refByte,&prev_row[i],pRefByte);
-        sum += wBuffer[i+1];
-        refByte++;
+    wBuffer[0] = 4; /* FILTER_PAETH */
+    for(i = 0; i < scanline_sz; i++) {
+        a = GET_LEFT(row, i, pix_sz);      /* Left */
+        b = prev_row[i];                   /* Up */
+        c = GET_LEFT(prev_row, i, pix_sz); /* Up-Left */
+        
+        /* Note: paeth_pred should return the VALUE, not a pointer to it */
+        wBuffer[i + 1] = (uint8_t)(row[i] - *paeth_pred(&a, &b, &c));
+        sum += abs((int8_t)wBuffer[i + 1]);
     }
-    return sum; 
+    return sum;
 }
+
 const write_filter filter_funcs[5] = {
     none_func,
     sub_func,

@@ -222,7 +222,6 @@ void count_literals(uint16_t symbol){
   /*if(symbol>=LCODEBASE){
     symbol = LCODEBASE+LENCODE_LOOKUP[symbol-LCODEBASE];
   }*/
-    int c;
   long* r = &(literalcodes->freq[symbol]); 
   if(*r==0){
     literalcodes->table[symbol]=literalcodes->distinct;

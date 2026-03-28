@@ -35,7 +35,7 @@ static uint32_t head[1<<24-1];   /* head of chain for each hash */
 static uint32_t prev[1<<24-1]; /* previous positions in the same hash */
 
 extern uint32_t hash3(const uint8_t *buf);
-extern void insert_hash(const uint8_t* window, long int pos);
+extern void insert_hash(const uint8_t* window, long int pos, long int input_size);
 
 int find_match(const uint8_t* window, size_t input_size, size_t pos, int maxlen, int *best_dist);
 extern int generate_lzss_pointers(uint8_t* input,long int input_size,slzss_pointer* lzss_ptrs,int ptr_n,long int* data_cnt,

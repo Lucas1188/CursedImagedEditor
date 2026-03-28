@@ -16,7 +16,10 @@ unsigned int hash3(const uint8_t *buf) {
   return (buf[0] | (buf[1] << 8) | (buf[2]<<16))&((1<<24)-1);
 }
 
-void insert_hash(const uint8_t* window, long int pos) {
+void insert_hash(const uint8_t* window, long int pos, long int input_size){
+  if (pos + 2 >= input_size) {
+        return; 
+    }
   unsigned int h = hash3(window + pos);
     int wpos = pos & (WINDOW_SIZE - 1);
 
@@ -83,7 +86,7 @@ int generate_lzss_pointers(uint8_t* input,long int input_size,slzss_pointer* lzs
   
   int ptr_count,remaining,maxlen,match_len,dist,i;
   long int pos;
-  uint16_t symbol;
+  uint16_t symbol=0;
   uint8_t* s;
   ptr_count = 0;
   for(pos = 0; pos < (input_size - MIN_MATCH); pos++){
@@ -100,7 +103,7 @@ int generate_lzss_pointers(uint8_t* input,long int input_size,slzss_pointer* lzs
         fn_olptr((uint16_t)match_len,(uint16_t)dist);
 
         for(i=0;i<match_len;i++){
-            insert_hash((const uint8_t*)input, pos+i);
+            insert_hash((const uint8_t*)input, pos+i, input_size);
             s = (uint8_t*)&symbol;
             s[0] = input[pos+i];
             s[1] = 0;
@@ -110,7 +113,7 @@ int generate_lzss_pointers(uint8_t* input,long int input_size,slzss_pointer* lzs
         pos += match_len - 1;
     }
     else{
-      insert_hash((const uint8_t*) input, pos);
+      insert_hash((const uint8_t*) input, pos, input_size);
       s = (uint8_t*)&symbol;
       s[0] = input[pos];
       s[1] = 0;

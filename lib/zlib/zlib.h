@@ -1,3 +1,5 @@
+#ifndef ZLIB_H
+#define ZLIB_H
 #include <stdint.h>
 
 typedef uint32_t sDICTID;
@@ -17,9 +19,9 @@ typedef struct{
                                         bits 6 to 7  FLEVEL  (compression level)*/
 } zlib_header;
 
-const uint8_t CM_DEFLATE = 8;
+extern const uint8_t CM_DEFLATE;
 
-const uint8_t CINFO_DEFLATE_WINDOW = 7;
+extern const uint8_t CINFO_DEFLATE_WINDOW;
 
 /*
     FLEVEL (Compression level)
@@ -43,3 +45,7 @@ typedef enum{
     LDEFAULT,
     LMAX_SLOW
 }EFLEVEL;
+
+uint8_t make_flg(uint8_t FLVL, uint8_t FDICT_PRESENT, uint8_t CMF);
+uint8_t make_cmf(uint8_t CINFO, uint8_t CM);
+#endif

@@ -6,6 +6,8 @@
 #include "../crc32/crc32.h"
 #include "../deflate/deflate.h"
 #include "../cursedhelpers.h"
+#include "../zlib/zlib.h"
+#include "../adler32/adler32.h"
 
 uint32_t bswap32(uint32_t x) {
     return ((x & 0x000000FF) << 24) |
@@ -43,16 +45,21 @@ png_s create_png_container(ihdr_chunk header){
     uint8_t* hdrb;
     
     hdrb = copy_header(&header);
+    uint32_t c;
+    c = crc32(0xFFFFFFFF, IHDR_ID, 4);
+    c = crc32(c, hdrb, 13);
+    c ^= 0xFFFFFFFF; 
     
     hdr = (png_chunk){
         .LENGTH = 13,
         .CHUNK_TYPE = {0x49, 0x48, 0x44, 0x52},
         .CHUNK_DATA = hdrb,
-        .CRC = crc32(0xFFFFFFFF,hdrb,13)
+        .CRC = c
     };
     end = (png_chunk){
         .LENGTH =0,
-        .CHUNK_TYPE = {0x49, 0x45, 0x4E, 0x44}
+        .CHUNK_TYPE = {0x49, 0x45, 0x4E, 0x44},
+        .CRC = crc32(0xFFFFFFFF, IEND_ID, 4) ^ 0xFFFFFFFF
     };
     p = (png_s){
         .MAGIC = {137, 80, 78, 71, 13, 10, 26, 10},
@@ -64,31 +71,52 @@ png_s create_png_container(ihdr_chunk header){
 }
 
 
-int make_idat_chunks(const ihdr_chunk* header, const uint8_t* rawpx, const pxsz,idat_chunk*** idat_s){
+int make_idat_chunks(const ihdr_chunk* header, const uint8_t* rawpx, const size_t pxsz,idat_chunk*** idat_s){
     size_t row = 0, scanline_sz = header->width,nchunk=1,deflatedat,wdat=0,tidat;
-    uint8_t *prow,*dd;
+    uint8_t *prow,*dd,*ad;
     uint8_t* upperpad_ = calloc(header->width*pxsz,1);
     uint8_t* write_b = calloc(header->height*(header->width+1)*pxsz,1);
     int i=0;
     bitarray cba;
+    idat_chunk* current_chunk;
     prow = upperpad_;
     dd = write_b;
-    LOG_I("Creating rows\n");
+    LOG_I("Creating rows witn %d pixels width=%d\n", header->width * header->height, header->width);
     for(;row<header->height;row++){
-        dd = dd+(row*(header->width+1));
+        LOG_I("Row %ld\n",row);
         filter_row(&rawpx[row*header->width],prow,dd,header->width,pxsz);
         prow = dd+1;
+        dd = dd+(header->width+1);
     }
     deflatedat = (header->height)*(header->width+1)*pxsz;
     tidat = deflatedat;
+    LOG_I("Create ZLIB Header\n");
+    memset(&cba,0,sizeof(bitarray));
+
+    zlib_header zlh;
+    zlh.CMF = make_cmf(CINFO_DEFLATE_WINDOW,CM_DEFLATE);
+    zlh.FLG = make_flg(LDEFAULT,0,zlh.CMF);
+    packbytes_aligned(&cba, &zlh.CMF, 1);
+    packbytes_aligned(&cba, &zlh.FLG, 1);
+    ad = write_b;
+    size_t t;
+    uint32_t ad32,s1,s2;
+    s1 = 1; s2=0;
+    t = deflatedat;
+    LOG_I("Calculate ADLER32 with %ld bytes\n",t);
+    while(t>0){
+        ad32 = adler32(*ad,&s1,&s2);
+        ad++;
+        t--;
+    }
     LOG_I("Creating Deflate\n");
     dd = write_b;
+    
     do{
-        (*idat_s) = realloc((*idat_s),nchunk*sizeof(idat_chunk*));
+        *idat_s = (idat_chunk**)realloc(*idat_s,nchunk*sizeof(idat_chunk*));
         LOG_I("Realloc idat_s with chunk n = %ld\n",nchunk);
-
-        (*idat_s)[nchunk-1] = calloc(sizeof(idat_chunk),1);
-
+        current_chunk = (idat_chunk*) calloc(1,sizeof(idat_chunk));
+        (*idat_s)[nchunk-1] = current_chunk;
         LOG_I("Start Deflate\n");
         wdat = deflate(&cba,dd,deflatedat);
         if(wdat<=0){
@@ -96,14 +124,20 @@ int make_idat_chunks(const ihdr_chunk* header, const uint8_t* rawpx, const pxsz,
             break;
         }   
         bitarray_flush(&cba);
-        (*idat_s)[nchunk-1]->sz = cba.used;
-        (*idat_s)[nchunk-1]->data = cba.data;
-        memset(&cba,0,sizeof(bitarray));
-        dd += wdat;
         deflatedat-=wdat;
+
+        LOG_I("End Deflate with compressed len: %ld rem: %ld\n", cba.used, deflatedat);
+
+        current_chunk->sz = cba.used;
+        current_chunk->data = cba.data;
+        dd += wdat;
         nchunk++;
     }while(deflatedat>0);
-    LOG_I("Wrote %ld bytes to deflate stream with %ld chunks",tidat,nchunk-1);
+    LOG_I("Wrote %ld bytes to deflate stream with %ld chunks\n",tidat,nchunk-1);
+    LOG_I("AD32: %x\n",ad32);
+    packbytes_aligned(&cba,(uint8_t*)&ad32,sizeof(ad32));
+    current_chunk->sz = cba.used;
+    
     free(upperpad_);
     free(write_b);
     return nchunk-1;
@@ -117,9 +151,9 @@ void encapsulate_idatchunks(png_s* p,idat_chunk** chunks, size_t nchunks){
         memcpy(&p->pidat_chunks[i]->CHUNK_TYPE,IDAT_ID,4);
         p->pidat_chunks[i]->LENGTH = chunks[i]->sz;
         p->pidat_chunks[i]->CHUNK_DATA = chunks[i]->data;
-        p->pidat_chunks[i]->CRC = crc32(0xFFFFFFFF,(uint8_t*)&(p->pidat_chunks[i]->CHUNK_TYPE),4);
-        p->pidat_chunks[i]->CRC = crc32(p->pidat_chunks[i]->CRC,(uint8_t*)&(p->pidat_chunks[i]->CHUNK_DATA),p->pidat_chunks[i]->LENGTH);
-
+        p->pidat_chunks[i]->CRC = crc32(0xFFFFFFFF,IDAT_ID,4);
+        p->pidat_chunks[i]->CRC = crc32(p->pidat_chunks[i]->CRC,(uint8_t*)(p->pidat_chunks[i]->CHUNK_DATA),p->pidat_chunks[i]->LENGTH);
+        p->pidat_chunks[i]->CRC ^= 0xFFFFFFFF;
     }
 }
 static void write_chunk(FILE* f, png_chunk* c) {
@@ -156,12 +190,12 @@ int main(int argv, char** argc){
         px[i*4] = 1<<15;
     }
     LOG_I("Creating Header\n");
-    ihdrc = IHDR_TRUECOLOR16_A16(100,100);
+    ihdrc = IHDR_TRUECOLOR16_A16(h,w);
     LOG_I("Wrote Header\n");
     p = create_png_container(ihdrc);
     LOG_I("Writing chunks\n");
     idat_c_ptrs = NULL;
-    p.n_idatchunks = make_idat_chunks(&ihdrc,raw_px,100*100,&idat_c_ptrs);
+    p.n_idatchunks = make_idat_chunks(&ihdrc,raw_px,8,&idat_c_ptrs);
     LOG_I("Writing chunks in containers\n");
     encapsulate_idatchunks(&p,idat_c_ptrs,p.n_idatchunks);
     /* ---- WRITE TO FILE ---- */
@@ -171,10 +205,8 @@ int main(int argv, char** argc){
         return 1;
     }
     fwrite(p.MAGIC,8,1,f);
-    write_chunk(f,&p.pihdr);
     /* IHDR */
     write_chunk(f, &p.pihdr);
-
     /* IDAT(s) */
     for (j = 0; j < p.n_idatchunks; j++) {
         write_chunk(f, p.pidat_chunks[j]);
@@ -184,7 +216,7 @@ int main(int argv, char** argc){
     write_chunk(f, &p.piend);
     fclose(f);
 
-    printf("PNG written to out.png\n");
+    LOG_I("PNG written to out.png\n");
 
     /* cleanup */
     free(raw_px);
