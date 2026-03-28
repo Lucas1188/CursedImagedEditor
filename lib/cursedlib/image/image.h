@@ -25,19 +25,30 @@ typedef struct{
     uint64_t maskG;
     uint64_t maskB;
     uint64_t maskA;
-    uint8_t pixel_sz;
+    uint8_t smpl_sz;
 }spixel_fmt;
 
 typedef uint64_t tcursed_pix;
 
-void make_spixel_fmt(const spixel_fmt_info* pixel_info, spixel_fmt* px_fmtout);
+typedef struct{
+    size_t height;
+    size_t width;
+    spixel_fmt px_fmt;
+    tcursed_pix* pxs; 
+}cursed_img;
 
-#define SCOLOR_FMT(sz_, offset_) { (sz_), (offset_) }
+#define SCOLOR_FMT(sz_, offset_)(scolor_fmt) {.sz=(sz_),.bit_offset= (offset_) }
 
-#define CURSED_RGBA64_PXFMT(px_fmtout)                                                                                      \
-    do {                                                                                                                    \
-        spixel_fmt_info sfi = {SCOLOR_FMT(16,48), SCOLOR_FMT(16,32),SCOLOR_FMT(16,16),SCOLOR_FMT(16,0),SCOLOR_FMT(0,0)};    \
-        make_spixel_fmt(&sfi,px_fmtout);                                                                                    \
-    }while(0);                                                                                                              \
+#define CURSED_RGBA64_PXFMT (spixel_fmt){                                                                               \
+    .info=(spixel_fmt_info){SCOLOR_FMT(16,48), SCOLOR_FMT(16,32),SCOLOR_FMT(16,16),SCOLOR_FMT(16,0),SCOLOR_FMT(0,0)},   \
+    .maskR = 0xFFFF000000000000,                                                                                        \
+    .maskG = 0x0000FFFF00000000,                                                                                        \
+    .maskB = 0x00000000FFFF0000,                                                                                        \
+    .maskA = 0x000000000000FFFF,                                                                                        \
+    .smpl_sz = 16                                                                                                       \
+}                                                                        
+
+
+
 
 #endif

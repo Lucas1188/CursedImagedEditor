@@ -21,7 +21,7 @@ int compress_text(char* data,size_t input_sz,bitarray* bBuffer){
 int main(int argv, char* argc[]){
     /*Text mode only*/
     int sz = 0;
-    bitarray bBuffer;
+    bitarray bBuffer = {0};
     FILE* wf;
     if(argv<2){
         printf("Usage: %s <input string>\n",argc[0]);
