@@ -160,6 +160,79 @@ bitmap* read_bitmap(const char* filename){
     return bmp;
 }
 
+static int write_u16_le(FILE* f, uint16_t v){
+    uint8_t b[2];
+    b[0] = (uint8_t)(v);
+    b[1] = (uint8_t)(v >> 8);
+    return fwrite(b, 1, 2, f) == 2;
+}
+
+static int write_u32_le(FILE* f, uint32_t v){
+    uint8_t b[4];
+    b[0] = (uint8_t)(v);
+    b[1] = (uint8_t)(v >>  8);
+    b[2] = (uint8_t)(v >> 16);
+    b[3] = (uint8_t)(v >> 24);
+    return fwrite(b, 1, 4, f) == 4;
+}
+
+int write_bitmap(const bitmap* bmp, const char* filename){
+    FILE*    f;
+    uint32_t row_stride, pad, file_size, row, x;
+    uint8_t* in;
+    uint8_t  bgr[3];
+    uint8_t  zeros[3] = {0, 0, 0};
+
+    if(!bmp || !filename) return 0;
+
+    /* 24-bit output: 3 bytes per pixel, rows padded to 4-byte boundary */
+    row_stride = ((bmp->width * 3 + 3) & ~3u);
+    pad        = row_stride - bmp->width * 3;
+    file_size  = 14 + 40 + row_stride * bmp->height;
+
+    f = fopen(filename, "wb");
+    if(!f){ LOG_E("write_bitmap: failed to open %s\n", filename); return 0; }
+
+    /* File header (14 bytes) */
+    fwrite("BM", 1, 2, f);
+    write_u32_le(f, file_size);
+    write_u32_le(f, 0);   /* reserved */
+    write_u32_le(f, 54);  /* pixel data starts at byte 54: 14 + 40 */
+
+    /* DIB header / BITMAPINFOHEADER (40 bytes) */
+    write_u32_le(f, 40);              /* header size */
+    write_u32_le(f, bmp->width);
+    write_u32_le(f, bmp->height);     /* positive = bottom-up storage */
+    write_u16_le(f, 1);               /* color planes */
+    write_u16_le(f, 24);              /* bits per pixel */
+    write_u32_le(f, 0);               /* compression = BI_RGB */
+    write_u32_le(f, row_stride * bmp->height); /* raw pixel data size */
+    write_u32_le(f, 0);               /* x pixels per meter */
+    write_u32_le(f, 0);               /* y pixels per meter */
+    write_u32_le(f, 0);               /* colors in table */
+    write_u32_le(f, 0);               /* important colors */
+
+    /*
+        Pixel data: BMP stores rows bottom-to-top.
+        bmp->pixels is top-left first, so row 0 of our buffer
+        is the top row of the image, which must be written last.
+    */
+    for(row = 0; row < bmp->height; row++){
+        in = bmp->pixels + (bmp->height - 1 - row) * bmp->width * 4;
+        for(x = 0; x < bmp->width; x++, in += 4){
+            bgr[0] = in[2]; /* B */
+            bgr[1] = in[1]; /* G */
+            bgr[2] = in[0]; /* R */
+            fwrite(bgr, 1, 3, f);
+        }
+        if(pad) fwrite(zeros, 1, pad, f);
+    }
+
+    fclose(f);
+    LOG_I("write_bitmap: %ux%u written to %s\n", bmp->width, bmp->height, filename);
+    return 1;
+}
+
 void free_bitmap(bitmap* bmp){
     if(!bmp) return;
     free(bmp->pixels);

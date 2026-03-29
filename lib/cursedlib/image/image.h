@@ -1,6 +1,7 @@
 #ifndef CURSEDIMAGE_H
 #define CURSEDIMAGE_H
 
+#include <stdio.h>
 #include <stdint.h>
 
 typedef struct{
@@ -46,9 +47,8 @@ typedef struct{
     .maskB = 0x00000000FFFF0000,                                                                                        \
     .maskA = 0x000000000000FFFF,                                                                                        \
     .smpl_sz = 16                                                                                                       \
-}                                                                        
+}
 
-
-
+void free_cursed_img(cursed_img* img);
 
 #endif

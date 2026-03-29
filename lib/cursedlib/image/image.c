@@ -1,6 +1,8 @@
 #include "image.h"
 #include <stdio.h>
+#include <stdlib.h>
 
+/* 
 void make_spixel_fmt(const spixel_fmt_info* pixel_info, spixel_fmt* px_fmtout){
     
     px_fmtout->pixel_sz += pixel_info->R.sz;
@@ -15,9 +17,16 @@ void make_spixel_fmt(const spixel_fmt_info* pixel_info, spixel_fmt* px_fmtout){
     memcpy(&px_fmtout->info,pixel_info,sizeof(spixel_fmt_info));    
 }
 
+*/
+
+void free_cursed_img(cursed_img* img){
+    if(!img) return;
+    free(img->pxs);
+    free(img);
+}
+
 #ifdef STANDALONE_CURSEDIMAGE
 int main(int argv, char** argc){
-    
     return 0;
 }
 #endif

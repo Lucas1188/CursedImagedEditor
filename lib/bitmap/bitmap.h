@@ -65,6 +65,7 @@ typedef struct bitmap{
 }bitmap;
 
 bitmap* read_bitmap(const char* filename);
+int     write_bitmap(const bitmap* bmp, const char* filename);
 void    free_bitmap(bitmap* bmp);
 
 #endif

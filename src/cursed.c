@@ -1,6 +1,9 @@
-#include "../lib/cursedhelpers.h"  
-#include "../lib/gzip/gzip.h" 
+#include "../lib/cursedhelpers.h"
+#include "../lib/gzip/gzip.h"
 #include "../lib/deflate/deflate.h"
+#include "../lib/bitmap/bitmap.h"
+#include "../lib/bitmap/bitmap_cursed.h"
+#include "../lib/cursedlib/image/image.h"
 
 int compress_text(char* data,size_t input_sz,bitarray* bBuffer){
     int wrote_b = 0,total_written = 0,i=0;
@@ -31,6 +34,29 @@ int main(int argv, char* argc[]){
     LOG_I("Input [2]: %s\n",argc[2]);
 
     if(argc[1][0]=='-'){
+        if(argc[1][1] == 'b'){
+            bitmap*     bmp;
+            cursed_img* img;
+            bitmap*     out;
+            if(argv < 4){
+                LOG_E("Usage: %s -b <input.bmp> <output.bmp>\n", argc[0]);
+                return 1;
+            }
+            bmp = read_bitmap(argc[2]);
+            if(!bmp) return 1;
+            img = bitmap_to_cursed(bmp);
+            free_bitmap(bmp);
+            if(!img) return 1;
+            out = cursed_to_bitmap(img);
+            free_cursed_img(img);
+            if(!out) return 1;
+            if(!write_bitmap(out, argc[3])){
+                free_bitmap(out);
+                return 1;
+            }
+            free_bitmap(out);
+            return 0;
+        }
         if(argc[1][1] == 'f'){
             LOG_I("Writing GZIP file [%c]\n",argc[1][1]);
             if(write_gzip_from_file(argc[2],&bBuffer)>0){

@@ -337,7 +337,7 @@ typedef struct{
 #define IHDR_GRAYSCALE8(w, h, comp) \
     IHDR_GEN(w,h,comp,8,CT_GRAYSCALE)
 
-#define IHDR_GRAYSCALE16(w, h, comp) \  
+#define IHDR_GRAYSCALE16(w, h, comp) \
     IHDR_GEN(w,h,comp,16,CT_GRAYSCALE)
 
 #define IHDR_GRAYSCALE8_A8(w, h, comp) \
