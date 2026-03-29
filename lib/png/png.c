@@ -169,6 +169,51 @@ static void write_chunk(FILE* f, png_chunk* c) {
     uint32_t crc_be = bswap32(c->CRC);
     fwrite(&crc_be, 4, 1, f);
 }
+
+int write_png(const char* filename, png_s* p){
+    size_t j;
+    FILE* f = fopen(filename, "wb");
+    if (!f) {
+        perror("fopen");
+        return 1;
+    }
+    fwrite(p->MAGIC,8,1,f);
+    /* IHDR */
+    write_chunk(f, &p->pihdr);
+    /* IDAT(s) */
+    for (j = 0; j < p->n_idatchunks; j++) {
+        write_chunk(f, p->pidat_chunks[j]);
+    }
+
+    /* IEND */
+    write_chunk(f, &p->piend);
+    fclose(f);
+    return 0;
+}
+
+png_s* create_png(const ihdr_chunk* header, const uint8_t* rawpx, const size_t pxsz){
+    png_s* p = malloc(sizeof(png_s));
+    *p = create_png_container(*header);
+    idat_chunk** idat_c_ptrs = NULL;
+    p->n_idatchunks = make_idat_chunks(header, rawpx, pxsz, &idat_c_ptrs);
+    encapsulate_idatchunks(p, idat_c_ptrs, p->n_idatchunks);
+    free(idat_c_ptrs);
+    return p;
+}
+
+int free_png(png_s* p){
+    size_t j;
+    if(!p) return 1;
+    free(p->pihdr.CHUNK_DATA);
+    for (j = 0; j < p->n_idatchunks; j++) {
+        free(p->pidat_chunks[j]->CHUNK_DATA);
+        free(p->pidat_chunks[j]);
+    }
+    free(p->pidat_chunks);
+    free(p);
+    return 0;
+}
+
 #ifdef STANDALONE_PNG
 int main(int argv, char** argc){
     
@@ -188,10 +233,10 @@ int main(int argv, char** argc){
     LOG_I("Calloc Raw bytes\n");
     for(i=0;i<h*w;i++){
             /* Indexing: [R, G, B, A]*/
-        px[i*4]     = bswap16(0xFFFF); /* Red*/           
-        px[i*4 + 1] = 0;               /* Green*/
+        if(i%2==0)  px[i*4]     = 0x00FF; /* Red*/           
+        if(i%2==1)  px[i*4 + 1] = 0xFF00;               /* Green*/
         px[i*4 + 2] = 0;               /* Blue*/
-        px[i*4 + 3] = bswap16(0xFFFF); /* Alpha (MUST be set to see the color)*/
+        px[i*4 + 3] = 0xFFFF; /* Alpha (MUST be set to see the color)*/
     }
     LOG_I("Creating Header\n");
     ihdrc = IHDR_TRUECOLOR16_A16(h,w);

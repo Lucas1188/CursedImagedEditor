@@ -82,7 +82,6 @@ int64_t paeth_func(const uint8_t* row, uint8_t* prev_row, uint8_t* wBuffer, cons
         b = prev_row[i];                   /* Up */
         c = GET_LEFT(prev_row, i, pix_sz); /* Up-Left */
         
-        /* Note: paeth_pred should return the VALUE, not a pointer to it */
         wBuffer[i + 1] = (uint8_t)(row[i] - *paeth_pred(&a, &b, &c));
         sum += abs((int8_t)wBuffer[i + 1]);
     }
@@ -96,6 +95,8 @@ const write_filter filter_funcs[5] = {
     avg_func,
     paeth_func
 };
+
+/*Use minimum sum heuristic*/
 
 uint8_t* filter_row(const uint8_t* row, uint8_t* prev_row, uint8_t* wBuffer, const size_t scanline_sz,const size_t pix_sz){
     int i,j,sum,min_fil,nsum;

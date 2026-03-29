@@ -280,7 +280,7 @@ int deflate(bitarray* bBuffer, uint8_t* data,size_t input_sz){
     for(i=0;i<WINDOW_SIZE;i++) head[i] = -1;
     for(i=0;i<WINDOW_SIZE;i++) prev[i] = -1;
     
-    
+    /*Assign globally available pointers*/
     global_codingtable[0] = &o_huffman;  
     global_codingtable[1] = &d_huffman;
     global_codingtable[2] = &cl_huffman;
@@ -288,7 +288,7 @@ int deflate(bitarray* bBuffer, uint8_t* data,size_t input_sz){
     memset(cnodes,0,sizeof(cnodes));
     memset(dnodes,0,sizeof(dnodes));
     memset(clnodes,0,sizeof(clnodes));
-    
+
     global_nodes[0] = cnodes;
     global_nodes[1] = dnodes;
     global_nodes[2] = clnodes;
@@ -350,7 +350,7 @@ int deflate(bitarray* bBuffer, uint8_t* data,size_t input_sz){
     LOG_I("\n");
     int HCLEN = max_cl-3;
 
-    LOG_V("HLIT:%d HDIST:%d HCLEN:%d\n",HLIT,HDIST,HCLEN);
+    LOG_I("HLIT:%d HDIST:%d HCLEN:%d\n",HLIT,HDIST,HCLEN);
     packbits(bh,1,1);      /*BFINAL =1*/
     PRINT_BINARY(1,1);
 

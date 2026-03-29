@@ -351,5 +351,12 @@ typedef struct{
 
 }png_s;
 
-png_s create_png(size_t w, size_t h, ihdr_chunk header);
+/*Public functions*/
+
+png_s* create_png(const ihdr_chunk* header, const uint8_t* rawpx, const size_t pxsz);
+
+int free_png(png_s* p);
+
+int write_png(const char* filename, png_s* p);
+
 #endif
