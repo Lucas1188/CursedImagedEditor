@@ -1,5 +1,8 @@
+#ifndef PNG_H
+#define PNG_H
 
 #include <stdint.h>
+#include <stddef.h>
 
 /*
     +---------------+               
@@ -296,7 +299,7 @@ typedef struct{
 
 typedef uint32_t iend_chunk;
 
-#define PNG_MAGIC {137, 80, 78, 71, 13, 10, 26, 10};
+
 #define IEND_ID {0x49, 0x45, 0x4E, 0x44}
 #define IDAT_ID {0x49, 0x44, 0x41, 0x54}
 #define PLTE_ID {0x50, 0x4C, 0x54, 0x45}
@@ -345,3 +348,51 @@ typedef struct{
 
 #define IHDR_GRAYSCALE16_A16(w, h, comp) \
     IHDR_GEN(w,h,comp,16,CT_GRAY_ALPHA)
+
+/*
+    +-------------------+
+    |   png_img         |
+    +-------------------+
+
+    Decoded image data returned by read_png / consumed by write_png.
+    Pixels are always stored as RGBA, row-major, top-left first.
+
+    bit_depth == 8:
+        4 bytes per pixel  [R, G, B, A]  (values 0-255)
+
+    bit_depth == 16:
+        8 bytes per pixel  [Rhi, Rlo, Ghi, Glo, Bhi, Blo, Ahi, Alo]
+        Each channel is a big-endian uint16 (values 0-65535)
+*/
+typedef struct {
+    uint32_t width;
+    uint32_t height;
+    uint8_t  bit_depth;   /* 8 or 16 */
+    uint8_t  color_type;  /* one of the COLOR_TYPE enum values */
+    uint8_t* pixels;
+} png_img;
+
+/*
+    read_png:
+        Reads and decodes a PNG file.  Supports 8-bit and 16-bit
+        truecolor (CT_RGB, CT_RGB_ALPHA) and grayscale (CT_GRAYSCALE,
+        CT_GRAY_ALPHA).  Indexed-color and interlaced PNGs are rejected.
+        Caller frees the result with free_png_img().
+*/
+png_img* read_png(const char* filename);
+
+/*
+    write_png:
+        Encodes and writes a PNG file from a png_img.
+        Always outputs CT_RGB_ALPHA (RGBA) at the bit depth stored in img.
+        Returns 1 on success, 0 on failure.
+*/
+int write_png(const png_img* img, const char* filename);
+
+/*
+    free_png_img:
+        Frees a png_img and its pixel buffer.
+*/
+void free_png_img(png_img* img);
+
+#endif /* PNG_H */

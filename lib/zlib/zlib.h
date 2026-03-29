@@ -1,4 +1,6 @@
 #include <stdint.h>
+#include <stddef.h>
+#include "../bithelper/bithelpers.h"
 
 typedef uint32_t sDICTID;
 
@@ -43,3 +45,14 @@ typedef enum{
     LDEFAULT,
     LMAX_SLOW
 }EFLEVEL;
+
+int write_zlib_from_file(const char* filename, bitarray* bData);
+
+/*
+    write_zlib_from_buf:
+        Compresses a memory buffer into a ZLIB stream (RFC 1950).
+        Writes the ZLIB header, DEFLATE-compressed data, and a
+        big-endian ADLER32 checksum into bData.
+        Returns the number of bytes written, or -1 on failure.
+*/
+int write_zlib_from_buf(const uint8_t* data, size_t sz, bitarray* bData);

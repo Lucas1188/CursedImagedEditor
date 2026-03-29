@@ -94,6 +94,40 @@ int write_zlib_from_file(const char* filename, bitarray* bData){
     return bData->used;
 }
 
+int write_zlib_from_buf(const uint8_t* data, size_t sz, bitarray* bData)
+{
+    zlib_header header;
+    uint32_t    s1, s2, adler;
+    uint8_t     adler_be[4];
+    size_t      i;
+    long        processed;
+
+    /* Compute ADLER32 of the uncompressed data (big-endian in ZLIB trailer) */
+    s1 = 1; s2 = 0;
+    for(i = 0; i < sz; i++) adler32(data[i], &s1, &s2);
+    adler = (s2 << 16) | s1;
+
+    header.CMF = make_cmf(CINFO_DEFLATE_WINDOW, CM_DEFLATE);
+    header.FLG = make_flg(LDEFAULT, 0, header.CMF);
+    packbytes_aligned(bData, (uint8_t*)&header, sizeof(zlib_header));
+
+    processed = deflate(bData, (uint8_t*)data, sz);
+    if(processed < 0) {
+        LOG_E("write_zlib_from_buf: deflate failed\n");
+        return -1;
+    }
+    bitarray_flush(bData);
+
+    /* ADLER32 written big-endian as required by RFC 1950 */
+    adler_be[0] = (uint8_t)(adler >> 24);
+    adler_be[1] = (uint8_t)(adler >> 16);
+    adler_be[2] = (uint8_t)(adler >>  8);
+    adler_be[3] = (uint8_t)(adler);
+    packbytes_aligned(bData, adler_be, 4);
+
+    return (int)bData->used;
+}
+
 #ifdef STANDALONE_ZLIB
 
 int main(int argv, char* argc[]){

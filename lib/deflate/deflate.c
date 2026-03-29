@@ -1,4 +1,5 @@
 
+#include <stdlib.h>
 #include "../bithelper/bithelpers.h"
 
 #include "deflate.h"
@@ -257,12 +258,13 @@ void count_ldcodes(uint16_t length, uint16_t distance){
 
 int deflate(bitarray* bBuffer, uint8_t* data,size_t input_sz){
 
-    uint8_t* input,distance_codes[WINDOW_SIZE];
+    uint8_t* input;
+    uint8_t* distance_codes;
     int i,j,min,f,offset,offset1,pos,dist,match_len,ptr_count,next_ptr,next_pos,input_size;
     long *r;
     uint16_t codetable[HUFFMAN_ALPHABET_SZ],sym,lcode;
     huffnode* cnodes[HUFFMAN_ALPHABET_SZ],*dnodes[29],*clnodes[18];
-    slzss_pointer lzss_ptrs[WINDOW_SIZE];
+    slzss_pointer* lzss_ptrs;
     huffmancoder o_huffman,cl_huffman,d_huffman;
     bitarray* bh;
     
@@ -277,7 +279,12 @@ int deflate(bitarray* bBuffer, uint8_t* data,size_t input_sz){
     ptr_count = 0;
     /*LZSS*/
     input_size = input_sz;
-    
+
+    lzss_ptrs = (slzss_pointer*)malloc((size_t)input_size * sizeof(slzss_pointer));
+    if(!lzss_ptrs) { LOG_E("deflate: OOM lzss_ptrs\n"); return -1; }
+    distance_codes = (uint8_t*)malloc((size_t)input_size * sizeof(uint8_t));
+    if(!distance_codes) { free(lzss_ptrs); LOG_E("deflate: OOM distance_codes\n"); return -1; }
+
     for(i=0;i<WINDOW_SIZE;i++) head[i] = -1;
     for(i=0;i<WINDOW_SIZE;i++) prev[i] = -1;
     
@@ -292,7 +299,7 @@ int deflate(bitarray* bBuffer, uint8_t* data,size_t input_sz){
     
     global_distancecodes[0] = distance_codes;
     LOG_I("LZSS portion inputsize: %d\n",input_size);
-    ptr_count = generate_lzss_pointers(input,input_size,lzss_ptrs,WINDOW_SIZE,&pos,count_ldcodes,count_literals); 
+    ptr_count = generate_lzss_pointers(input,input_size,lzss_ptrs,input_size,&pos,count_ldcodes,count_literals);
     /*Stops processing if we run out of ptr space in the stack*/
     count_literals(EOBCODE);
     
@@ -424,10 +431,10 @@ int deflate(bitarray* bBuffer, uint8_t* data,size_t input_sz){
     packbits(bh,o_huffman.revcodetable[EOBCODE]->code,o_huffman.revcodetable[EOBCODE]->codelen);
     
     free_huffman_heap(&o_huffman,HUFFMAN_ALPHABET_SZ);
-    
     free_huffman_heap(&d_huffman,30);
-    
     free_huffman_heap(&cl_huffman,19);
+    free(lzss_ptrs);
+    free(distance_codes);
 
     return pos;
 }
