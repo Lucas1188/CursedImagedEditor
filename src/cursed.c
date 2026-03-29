@@ -4,6 +4,7 @@
 #include "../lib/bitmap/bitmap.h"
 #include "../lib/bitmap/bitmap_cursed.h"
 #include "../lib/cursedlib/image/image.h"
+#include "../lib/cursedlib/image/filters/greyscale.h"
 
 int compress_text(char* data,size_t input_sz,bitarray* bBuffer){
     int wrote_b = 0,total_written = 0,i=0;
@@ -47,6 +48,9 @@ int main(int argv, char* argc[]){
             img = bitmap_to_cursed(bmp);
             free_bitmap(bmp);
             if(!img) return 1;
+            if(argv >= 5 && argc[4][0] == '-' && argc[4][1] == 'g'){
+                cursed_greyscale(img);
+            }
             out = cursed_to_bitmap(img);
             free_cursed_img(img);
             if(!out) return 1;
