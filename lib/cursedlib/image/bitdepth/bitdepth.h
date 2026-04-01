@@ -1,7 +1,9 @@
 #ifndef BITDEPTH_H
 #define BITDEPTH_H
 #include <stdint.h>
+#include <stdio.h>
 #include <stddef.h>
+
 
 extern const uint8_t BITD_BYTE_BOUNDARY[16];
 

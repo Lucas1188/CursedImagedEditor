@@ -1,6 +1,7 @@
-
+#ifndef PNG_H
+#define PNG_H
 #include <stdint.h>
-
+#include <stddef.h>
 /*
     +---------------+               
     |   Prop Bits   |               
@@ -161,7 +162,7 @@ typedef struct{
     uint32_t LENGTH;        /*Although encoders and decoders should treat the length as unsigned, 
                             its value must not exceed (2^31)-1 bytes.*/
 
-    uint32_t CHUNK_TYPE;    /*A 4-byte chunk type code.  For convenience in description and
+    uint8_t CHUNK_TYPE [4]; /*A 4-byte chunk type code.  For convenience in description and
                             in examining PNG files, type codes are restricted to consist of
                             uppercase and lowercase ASCII letters (A-Z and a-z, or 65-90
                             and 97-122 decimal).  However, encoders and decoders must treat
@@ -205,7 +206,7 @@ typedef struct{
                                             sliding window) is defined. 
                                         */
 
-    FILTER_TYPES filter_method;         /*  Byte operation
+    FILTER_TYPES filter_method;         /*  Byte operation always 0 here
                                         */
 
     INTERLACE_TYPES interlace_method;   /*  None or Adam7
@@ -249,9 +250,9 @@ typedef struct{
     directly.  If PLTE is not present, such a viewer will need to
     select colors on its own, but it is often preferable for this
 */
-typedef struct{
-    /*Dont need this now*/
-}plte_chunk;
+/*typedef struct{
+
+}plte_chunk;*/
 /*
     +---------------+
     |   IDAT CHUNK  |
@@ -291,57 +292,71 @@ typedef struct{
 */
 
 typedef struct{
+    size_t sz;
     uint8_t* data;
 }idat_chunk;
 
 typedef uint32_t iend_chunk;
 
 #define PNG_MAGIC {137, 80, 78, 71, 13, 10, 26, 10};
-#define IEND_ID {0x49, 0x45, 0x4E, 0x44}
-#define IDAT_ID {0x49, 0x44, 0x41, 0x54}
-#define PLTE_ID {0x50, 0x4C, 0x54, 0x45}
-#define IHDR_ID {0x49, 0x48, 0x44, 0x52}
+static const uint8_t IEND_ID[4] = {0x49, 0x45, 0x4E, 0x44};
+static const uint8_t IDAT_ID[4] = {0x49, 0x44, 0x41, 0x54};
+static const uint8_t PLTE_ID[4] = {0x50, 0x4C, 0x54, 0x45};
+static const uint8_t IHDR_ID[4] = {0x49, 0x48, 0x44, 0x52};
 
-typedef struct{
-    
-    const uint8_t MAGIC [8];
-    ihdr_chunk pihdr_chunk;
-    idat_chunk** pidat_chunks;
-    iend_chunk piend;
 
-}png_format;
 
-#define IHDR_GEN(w,h,comp,bd,ct)\
+#define IHDR_GEN(w,h,bd,ct)\
     (ihdr_chunk){ \
         .width = (w), \
         .height = (h), \
         .bit_depth = (bd), \
         .color_type = (ct),       \
-        .compression_method = (comp), \
-        .filter_method = FILTER_NONE, \
-        .interlace_method = INTERLACE_NONE \
+        .compression_method = 0, \
+        .filter_method = 0, \
+        .interlace_method = INTL_NONE \
     }
 
-#define IHDR_TRUECOLOR8_A8(w, h, comp) \
-    IHDR_GEN(w,h,comp,8,CT_RGB_ALPHA)
+#define IHDR_TRUECOLOR8_A8(w, h) \
+    IHDR_GEN((w),(h),8,CT_RGB_ALPHA)
 
-#define IHDR_TRUECOLOR16_A16(w, h, comp) \
-    IHDR_GEN(w,h,comp,16,CT_RGB_ALPHA)
+#define IHDR_TRUECOLOR16_A16(w, h) \
+    IHDR_GEN((w),(h),16,CT_RGB_ALPHA)
 
-#define IHDR_TRUECOLOR8(w, h, comp) \
-    IHDR_GEN(w,h,comp,8,CT_RGB)
+#define IHDR_TRUECOLOR8(w, h) \
+    IHDR_GEN((w),(h),8,CT_RGB)
 
-#define IHDR_TRUECOLOR16(w, h, comp) \
-    IHDR_GEN(w,h,comp,16,CT_RGB)
+#define IHDR_TRUECOLOR16(w, h) \
+    IHDR_GEN((w),(h),16,CT_RGB)
 
-#define IHDR_GRAYSCALE8(w, h, comp) \
-    IHDR_GEN(w,h,comp,8,CT_GRAYSCALE)
+#define IHDR_GRAYSCALE8(w, h) \
+    IHDR_GEN((w),(h),8,CT_GRAYSCALE)
 
-#define IHDR_GRAYSCALE16(w, h, comp) \
-    IHDR_GEN(w,h,comp,16,CT_GRAYSCALE)
+#define IHDR_GRAYSCALE16(w, h) \
+    IHDR_GEN((w),(h),16,CT_GRAYSCALE)
 
-#define IHDR_GRAYSCALE8_A8(w, h, comp) \
-    IHDR_GEN(w,h,comp,8,CT_GRAY_ALPHA)
+#define IHDR_GRAYSCALE8_A8(w, h) \
+    IHDR_GEN((w),(h),8,CT_GRAY_ALPHA)
 
-#define IHDR_GRAYSCALE16_A16(w, h, comp) \
-    IHDR_GEN(w,h,comp,16,CT_GRAY_ALPHA)
+#define IHDR_GRAYSCALE16_A16(w, h) \
+    IHDR_GEN((w),(h),16,CT_GRAY_ALPHA)
+
+typedef struct{
+    
+    uint8_t MAGIC [8];
+    png_chunk pihdr;
+    png_chunk** pidat_chunks;
+    png_chunk piend;
+    size_t n_idatchunks;
+
+}png_s;
+
+/*Public functions*/
+
+png_s* create_png(const ihdr_chunk* header, const uint8_t* rawpx, const size_t pxsz);
+
+int free_png(png_s* p);
+
+int write_png(const char* filename, png_s* p);
+
+#endif

@@ -35,7 +35,7 @@ typedef struct {
     uint16_t repeat; /* only used for 16,17,18 */
 }rletoken;
 
-int get_distance_code(short distance);
+int get_distance_code(unsigned short distance);
 
 /*return bytes written*/
 int deflate(bitarray* bBuffer, uint8_t* data,size_t input_sz);

@@ -1,8 +1,7 @@
 
 #include "bitdepth.h"
-#include <stdio.h>
 
-const uint8_t BITD_BYTE_BOUNDARY[16]= {
+uint8_t BITD_BYTE_BOUNDARY[16]= {
     0,  1,  1,  1,  1,  1,  1,  1,  
     1,  2,  2,  2,  2,  2,  2,  2
 };

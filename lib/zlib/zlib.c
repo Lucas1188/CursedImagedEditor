@@ -6,6 +6,10 @@
 #include "../deflate/deflate.h"
 #include "../cursedhelpers.h"
 
+const uint8_t CM_DEFLATE = 8;
+
+const uint8_t CINFO_DEFLATE_WINDOW = 7;
+
 uint32_t get_file_ad32_fptr_fsz(const char* filename,FILE** f_out,size_t* size_out){
     size_t t,i;
     uint32_t ad32,s1,s2;
@@ -34,14 +38,22 @@ uint8_t make_cmf(uint8_t CINFO, uint8_t CM){
     return CINFO<<4 | CM;
 }
 
-uint8_t make_flg(uint8_t FLVL, uint8_t FDICT_PRESENT, uint8_t CMF){
-    uint8_t flg,fchk;
+uint8_t make_flg(uint8_t FLVL, uint8_t FDICT_PRESENT, uint8_t CMF) {
     uint16_t cs;
-    flg = (FLVL&3)<<6|(FDICT_PRESENT&1<<5);
-    cs = CMF<<8|flg;
-    fchk = 31-(cs%31);
-    flg = fchk==0?flg:flg|fchk;
-    return flg;
+    uint8_t flg;
+    uint8_t fcheck;
+
+    /* 1. Shift flags into position (FLVL bits 6-7, FDICT bit 5) */
+    flg = (uint8_t)((FLVL & 3) << 6) | (uint8_t)((FDICT_PRESENT & 1) << 5);
+
+    /* 2. Calculate what the remainder is currently */
+    cs = (uint16_t)(CMF << 8) | flg;
+    
+    /* 3. Find the value (0-30) that makes (cs + fcheck) % 31 == 0 */
+    fcheck = 31 - (cs % 31);
+    if (fcheck == 31) fcheck = 0;
+
+    return flg | fcheck;
 }
 
 int write_zlib_from_file(const char* filename, bitarray* bData){

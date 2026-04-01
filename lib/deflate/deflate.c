@@ -17,11 +17,11 @@ const uint8_t DISTANCE_LENS[30]={
   0,    0,    0,    0,    1,    1,
   2,    2,    3,    3,    4,    4,
   5,    5,    6,    6,    7,    7,
-  8,    8,    9,    9,    10,    10,
+  8,    8,    9,    9,    10,   10,
   11,   11,   12,   12,   13,   13
 };
 
-int get_distance_code(short distance){
+int get_distance_code(unsigned short distance){
   int i=0;
     for(i=0;i<30;i++){
         if(distance<DISTANCE_BASE[i]){
@@ -219,10 +219,7 @@ int rle_codelens(const uint16_t *codelens,
 
 void count_literals(uint16_t symbol){
   huffmancoder* literalcodes= global_codingtable[0];
-  /*if(symbol>=LCODEBASE){
-    symbol = LCODEBASE+LENCODE_LOOKUP[symbol-LCODEBASE];
-  }*/
-    int c;
+  
   long* r = &(literalcodes->freq[symbol]); 
   if(*r==0){
     literalcodes->table[symbol]=literalcodes->distinct;
@@ -249,6 +246,7 @@ void count_ldcodes(uint16_t length, uint16_t distance){
 
     global_nodes[1][dlcodes->distinct] = make_node(dcode,0,LEAF);
     dlcodes->distinct++;
+    LOG_I("Made new distance code %d from %hu\n",dcode,distance);
   }
   (*r)++;    
   global_nodes[1][dlcodes->table[dcode]]->freq++;
@@ -258,7 +256,8 @@ void count_ldcodes(uint16_t length, uint16_t distance){
 int deflate(bitarray* bBuffer, uint8_t* data,size_t input_sz){
 
     uint8_t* input,distance_codes[WINDOW_SIZE];
-    int i,j,min,f,offset,offset1,pos,dist,match_len,ptr_count,next_ptr,next_pos,input_size;
+    int min,f,offset,offset1,dist,match_len,ptr_count,next_ptr,next_pos;
+    long int pos,input_size,i,j;
     long *r;
     uint16_t codetable[HUFFMAN_ALPHABET_SZ],sym,lcode;
     huffnode* cnodes[HUFFMAN_ALPHABET_SZ],*dnodes[29],*clnodes[18];
@@ -281,25 +280,31 @@ int deflate(bitarray* bBuffer, uint8_t* data,size_t input_sz){
     for(i=0;i<WINDOW_SIZE;i++) head[i] = -1;
     for(i=0;i<WINDOW_SIZE;i++) prev[i] = -1;
     
-    
+    /*Assign globally available pointers*/
     global_codingtable[0] = &o_huffman;  
     global_codingtable[1] = &d_huffman;
     global_codingtable[2] = &cl_huffman;
     
+    memset(cnodes,0,sizeof(cnodes));
+    memset(dnodes,0,sizeof(dnodes));
+    memset(clnodes,0,sizeof(clnodes));
+
     global_nodes[0] = cnodes;
     global_nodes[1] = dnodes;
     global_nodes[2] = clnodes;
     
     global_distancecodes[0] = distance_codes;
-    LOG_I("LZSS portion inputsize: %d\n",input_size);
+    LOG_I("LZSS portion inputsize: %ld\n",input_size);
     ptr_count = generate_lzss_pointers(input,input_size,lzss_ptrs,WINDOW_SIZE,&pos,count_ldcodes,count_literals); 
     /*Stops processing if we run out of ptr space in the stack*/
     count_literals(EOBCODE);
     
-    LOG_I("\nTotal ptrs: %d ->%d\n",ptr_count,pos);
+    LOG_I("\nTotal ptrs: %d ->%ld\n",ptr_count,pos);
     
-    LOG_I("Parsed %d %d symbols\n",pos,o_huffman.distinct);
+    LOG_I("Parsed %ld %d symbols\n",pos,o_huffman.distinct);
+    LOG_I("\n=========Create Literal Tables========\n");
     create_table(&o_huffman,cnodes,HUFFMAN_ALPHABET_SZ,15);
+    LOG_I("\n=========Create Distance Tables========\n");
     create_table(&d_huffman,dnodes,30,15);
     
     uint16_t lit_codelens[HUFFMAN_ALPHABET_SZ];
@@ -315,16 +320,12 @@ int deflate(bitarray* bBuffer, uint8_t* data,size_t input_sz){
         combined[n++] = lit_codelens[i];
     for(i=0;i<d_n;i++)
         combined[n++] = d_codelens[i];
-    /*
-        for(i=0;i<n;i++){
-        if(combined[i])LOG_I("%d: [%d] \n",i,combined[i]);
-    }
-    */
+  
     int nc = rle_codelens(combined,n,compressedlens);
     LOG_I("Code len [%d] processed: %d\n",nc,n);
     for(i=0;i<nc;i++){
         count_clcodes(compressedlens[i].sym);
-        LOG_I("%d %d\n",i,compressedlens[i].sym);
+        LOG_V("%ld %d\n",i,compressedlens[i].sym);
     }
     create_table(&cl_huffman,clnodes,nc,15);
     
@@ -344,12 +345,12 @@ int deflate(bitarray* bBuffer, uint8_t* data,size_t input_sz){
         max_cl = cl_huffman.revcodetable[i]->codelen==0?max_cl:CODELEN_IDX_ORDER[i]>max_cl?CODELEN_IDX_ORDER[i]:max_cl;
     }
     for(i=0;i<=max_cl;i++){
-        LOG_I("%d\t[%d]: \t%d\n",i,CODELEN_ORDER[i],cl_lensbuffer[i]);
+        LOG_I("%ld\t[%d]: \t%d\n",i,CODELEN_ORDER[i],cl_lensbuffer[i]);
     }
     LOG_I("\n");
     int HCLEN = max_cl-3;
 
-    LOG_V("HLIT:%d HDIST:%d HCLEN:%d\n",HLIT,HDIST,HCLEN);
+    LOG_I("HLIT:%d HDIST:%d HCLEN:%d\n",HLIT,HDIST,HCLEN);
     packbits(bh,1,1);      /*BFINAL =1*/
     PRINT_BINARY(1,1);
 
@@ -368,7 +369,7 @@ int deflate(bitarray* bBuffer, uint8_t* data,size_t input_sz){
         int cl = cl_lensbuffer[i];
         packbits(bh,cl,3);
         PRINT_BINARY(cl,3);
-        LOG_I(" ");
+        LOG_I(",");
     }
     LOG_I("\n\nPacked bits for Literal & Distance lens\n");
     
@@ -396,6 +397,7 @@ int deflate(bitarray* bBuffer, uint8_t* data,size_t input_sz){
 
     while(i<input_size){
         if(i==next_pos){
+            LOG_V("LZSS match at pos %ld: length=%lu distance=%lu\n",i,lzss_ptrs[next_ptr].length,lzss_ptrs[next_ptr].distance);
             sym = lzss_ptrs[next_ptr].length;
             lcode = LENCODE_LOOKUP[sym];
             packbits(bh,o_huffman.revcodetable[lcode]->code,o_huffman.revcodetable[lcode]->codelen);
@@ -410,7 +412,9 @@ int deflate(bitarray* bBuffer, uint8_t* data,size_t input_sz){
             packbits(bh,sym-DISTANCE_BASE[lcode],DISTANCE_LENS[lcode]);/*write distance*/
             PRINT_BINARY(sym-DISTANCE_BASE[lcode],DISTANCE_LENS[lcode]);
             i+=lzss_ptrs[next_ptr].length;
-            next_pos = lzss_ptrs[++next_ptr].position;
+            if(next_ptr<WINDOW_SIZE && next_ptr+1<ptr_count){
+                 next_pos = lzss_ptrs[++next_ptr].position;
+            }
         }else{
             if(!o_huffman.revcodetable[input[i]]){
                 LOG_E("No code for symbol: %d\n",input[i]);

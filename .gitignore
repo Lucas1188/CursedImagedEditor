@@ -15,7 +15,10 @@ cursed
 *.swp
 *.swo
 *~
-
+*.gz
+*.onnx
+*.pptx
+*.txt
 # OS generated files
 .DS_Store
 Thumbs.db
