@@ -52,7 +52,6 @@ int main(int argv, char* argc[]){
                 cursed_greyscale(img);
             }
             out = cursed_to_bitmap(img);
-            free_cursed_img(img);
             if(!out) return 1;
             if(!write_bitmap(out, argc[3])){
                 free_bitmap(out);
