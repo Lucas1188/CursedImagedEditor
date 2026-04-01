@@ -255,17 +255,22 @@ void count_ldcodes(uint16_t length, uint16_t distance){
 
 int deflate(bitarray* bBuffer, uint8_t* data,size_t input_sz){
 
-    uint8_t* input,distance_codes[WINDOW_SIZE];
+    uint8_t* input;
+    uint8_t* distance_codes;
+    size_t max_ptrs;
     int min,f,offset,offset1,dist,match_len,ptr_count,next_ptr,next_pos;
     long int pos,input_size,i,j;
     long *r;
     uint16_t codetable[HUFFMAN_ALPHABET_SZ],sym,lcode;
     huffnode* cnodes[HUFFMAN_ALPHABET_SZ],*dnodes[29],*clnodes[18];
-    slzss_pointer lzss_ptrs[WINDOW_SIZE];
+    slzss_pointer* lzss_ptrs;
     huffmancoder o_huffman,cl_huffman,d_huffman;
     bitarray* bh;
-    
+
     bh = bBuffer;
+    max_ptrs = input_sz / MIN_MATCH + 1;
+    lzss_ptrs = (slzss_pointer*)malloc(max_ptrs * sizeof(slzss_pointer));
+    distance_codes = (uint8_t*)malloc(max_ptrs * sizeof(uint8_t));
 
     init_s_huffmancode(&o_huffman);
     init_s_huffmancode(&d_huffman);
@@ -295,7 +300,7 @@ int deflate(bitarray* bBuffer, uint8_t* data,size_t input_sz){
     
     global_distancecodes[0] = distance_codes;
     LOG_I("LZSS portion inputsize: %ld\n",input_size);
-    ptr_count = generate_lzss_pointers(input,input_size,lzss_ptrs,WINDOW_SIZE,&pos,count_ldcodes,count_literals); 
+    ptr_count = generate_lzss_pointers(input,input_size,lzss_ptrs,(int)max_ptrs,&pos,count_ldcodes,count_literals);
     /*Stops processing if we run out of ptr space in the stack*/
     count_literals(EOBCODE);
     
@@ -391,7 +396,7 @@ int deflate(bitarray* bBuffer, uint8_t* data,size_t input_sz){
 
     next_ptr = 0,i=0;
     next_pos = -1;
-    if(next_ptr<WINDOW_SIZE && ptr_count>0){
+    if(ptr_count>0){
         next_pos = lzss_ptrs[0].position;
     }
 
@@ -412,7 +417,7 @@ int deflate(bitarray* bBuffer, uint8_t* data,size_t input_sz){
             packbits(bh,sym-DISTANCE_BASE[lcode],DISTANCE_LENS[lcode]);/*write distance*/
             PRINT_BINARY(sym-DISTANCE_BASE[lcode],DISTANCE_LENS[lcode]);
             i+=lzss_ptrs[next_ptr].length;
-            if(next_ptr<WINDOW_SIZE && next_ptr+1<ptr_count){
+            if(next_ptr+1<ptr_count){
                  next_pos = lzss_ptrs[++next_ptr].position;
             }
         }else{
@@ -428,10 +433,12 @@ int deflate(bitarray* bBuffer, uint8_t* data,size_t input_sz){
     packbits(bh,o_huffman.revcodetable[EOBCODE]->code,o_huffman.revcodetable[EOBCODE]->codelen);
     
     free_huffman_heap(&o_huffman,HUFFMAN_ALPHABET_SZ);
-    
+
     free_huffman_heap(&d_huffman,30);
-    
+
     free_huffman_heap(&cl_huffman,19);
 
+    free(lzss_ptrs);
+    free(distance_codes);
     return pos;
 }

@@ -1,90 +1,155 @@
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
 #include "../lib/cursedhelpers.h"
-#include "../lib/gzip/gzip.h"
-#include "../lib/deflate/deflate.h"
 #include "../lib/bitmap/bitmap.h"
 #include "../lib/bitmap/bitmap_cursed.h"
 #include "../lib/cursedlib/image/image.h"
 #include "../lib/cursedlib/image/filters/greyscale.h"
+#include "../lib/png/png.h"
+#include "../lib/gzip/gzip.h"
 
-int compress_text(char* data,size_t input_sz,bitarray* bBuffer){
-    int wrote_b = 0,total_written = 0,i=0;
-    while(total_written<input_sz){
-        wrote_b = deflate(bBuffer,data,input_sz);
-        if(wrote_b<0){
-            LOG_E("Deflate error\n");
-            return 0;
-        }
-        LOG_V("Deflate Blk [%d]: Processed %d bytes\n",i,wrote_b);
-        total_written += wrote_b;
-        i++;
-    }
-    bitarray_flush(bBuffer);
-    return bBuffer->used;
+static void print_usage(const char* prog) {
+    fprintf(stderr,
+        "Usage: %s <input.bmp> <output> [-grey] [-png] [-gzip]\n"
+        "  -grey   apply greyscale filter\n"
+        "  -png    encode output as PNG\n"
+        "  -gzip   compress output with gzip\n"
+        "Flags may be combined. -png -gzip produces a gzip-compressed PNG.\n",
+        prog);
 }
 
-int main(int argv, char* argc[]){
-    /*Text mode only*/
-    int sz = 0;
-    bitarray bBuffer = {0};
+static int has_flag(int argc, char* argv[], const char* flag) {
+    int i;
+    for (i = 3; i < argc; i++) {
+        if (strcmp(argv[i], flag) == 0) return 1;
+    }
+    return 0;
+}
+
+static int gzip_file_to(const char* src, const char* dst) {
+    bitarray bBuffer;
     FILE* wf;
-    if(argv<2){
-        printf("Usage: %s <input string>\n",argc[0]);
+
+    bBuffer.data     = NULL;
+    bBuffer.size     = 0;
+    bBuffer.used     = 0;
+    bBuffer.bitbuf   = 0;
+    bBuffer.bitcount = 0;
+
+    if (write_gzip_from_file(src, &bBuffer) <= 0) {
+        LOG_E("Failed to compress: %s\n", src);
+        return 0;
+    }
+    bitarray_flush(&bBuffer);
+    wf = fopen(dst, "wb");
+    if (!wf) {
+        LOG_E("Failed to open output: %s\n", dst);
+        free(bBuffer.data);
+        return 0;
+    }
+    fwrite(bBuffer.data, 1, bBuffer.used, wf);
+    fclose(wf);
+    free(bBuffer.data);
+    return 1;
+}
+
+int main(int argc, char* argv[]) {
+    bitmap*     bmp;
+    cursed_img* img;
+    bitmap*     out_bmp;
+    png_s*      png;
+    ihdr_chunk  ihdr;
+    int         do_grey, do_png, do_gzip;
+    const char* tmp_path;
+
+    if (argc < 3) {
+        print_usage(argv[0]);
         return 1;
     }
-    LOG_I("Input [1]: %s\n",argc[1]);
-    LOG_I("Input [2]: %s\n",argc[2]);
 
-    if(argc[1][0]=='-'){
-        if(argc[1][1] == 'b'){
-            bitmap*     bmp;
-            cursed_img* img;
-            bitmap*     out;
-            if(argv < 4){
-                LOG_E("Usage: %s -b <input.bmp> <output.bmp>\n", argc[0]);
-                return 1;
-            }
-            bmp = read_bitmap(argc[2]);
-            if(!bmp) return 1;
-            img = bitmap_to_cursed(bmp);
-            free_bitmap(bmp);
-            if(!img) return 1;
-            if(argv >= 5 && argc[4][0] == '-' && argc[4][1] == 'g'){
-                cursed_greyscale(img);
-            }
-            out = cursed_to_bitmap(img);
-            if(!out) return 1;
-            if(!write_bitmap(out, argc[3])){
-                free_bitmap(out);
-                return 1;
-            }
-            free_bitmap(out);
-            return 0;
-        }
-        if(argc[1][1] == 'f'){
-            LOG_I("Writing GZIP file [%c]\n",argc[1][1]);
-            if(write_gzip_from_file(argc[2],&bBuffer)>0){
-                bitarray_flush(&bBuffer);
-                wf = fopen(argc[3],"wb");
-                if(!wf){
-                    LOG_E("Failed to open output file: %s\n",argc[3]);
-                    return 1;
-                }
-                fwrite(bBuffer.data,1,bBuffer.used,wf);
-                fclose(wf);
-                LOG_I("GZIP file written successfully to: %s\n",argc[3]);
-            }
+    do_grey = has_flag(argc, argv, "-grey");
+    do_png  = has_flag(argc, argv, "-png");
+    do_gzip = has_flag(argc, argv, "-gzip");
+    tmp_path = do_png ? "/tmp/cursed_intermediate.png" : "/tmp/cursed_intermediate.bmp";
 
-        }
-    }else{
-        while(argc[1][sz++]);
-        if(!compress_text(argc[1],sz,&bBuffer)){
-            LOG_E("Compression failed\n");
+    bmp = read_bitmap(argv[1]);
+    if (!bmp) {
+        LOG_E("Failed to read bitmap: %s\n", argv[1]);
+        return 1;
+    }
+
+    img = bitmap_to_cursed(bmp);
+    free_bitmap(bmp);
+    if (!img) {
+        LOG_E("Failed to convert bitmap to internal format\n");
+        return 1;
+    }
+
+    if (do_grey) {
+        cursed_greyscale(img);
+    }
+
+    out_bmp = cursed_to_bitmap(img);
+    RELEASE_CURSED_IMG(*img);
+    free(img);
+    if (!out_bmp) {
+        LOG_E("Failed to convert image to output bitmap\n");
+        return 1;
+    }
+
+    if (do_png) {
+        ihdr.width              = out_bmp->width;
+        ihdr.height             = out_bmp->height;
+        ihdr.bit_depth          = 8;
+        ihdr.color_type         = CT_RGB_ALPHA;
+        ihdr.compression_method = 0;
+        ihdr.filter_method      = FILTER_NONE;
+        ihdr.interlace_method   = INTL_NONE;
+
+        png = create_png(&ihdr, out_bmp->pixels, 4);
+        free_bitmap(out_bmp);
+        if (!png) {
+            LOG_E("Failed to create PNG\n");
             return 1;
         }
-    }   
-    if(bBuffer.used){
-        free(bBuffer.data);
+
+        if (do_gzip) {
+            if (write_png(tmp_path, png) != 0) {
+                free_png(png);
+                return 1;
+            }
+            free_png(png);
+            if (!gzip_file_to(tmp_path, argv[2])) {
+                remove(tmp_path);
+                return 1;
+            }
+            remove(tmp_path);
+        } else {
+            if (write_png(argv[2], png) != 0) {
+                free_png(png);
+                return 1;
+            }
+            free_png(png);
+        }
+    } else if (do_gzip) {
+        if (!write_bitmap(out_bmp, tmp_path)) {
+            free_bitmap(out_bmp);
+            return 1;
+        }
+        free_bitmap(out_bmp);
+        if (!gzip_file_to(tmp_path, argv[2])) {
+            remove(tmp_path);
+            return 1;
+        }
+        remove(tmp_path);
+    } else {
+        if (!write_bitmap(out_bmp, argv[2])) {
+            free_bitmap(out_bmp);
+            return 1;
+        }
+        free_bitmap(out_bmp);
     }
-    LOG_V("Compressed data (%ld bytes):\n", bBuffer.used);
+
     return 0;
 }

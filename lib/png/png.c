@@ -84,7 +84,7 @@ int make_idat_chunks(const ihdr_chunk* header, const uint8_t* rawpx, const size_
     LOG_I("Creating rows witn %d pixels width=%d\n", header->width * header->height, header->width);
     for(;row<header->height;row++){
         LOG_I("Row %ld\n",row);
-        filter_row(&rawpx[row*header->width],prow,dd,header->width*pxsz,pxsz);
+        filter_row(&rawpx[row*header->width*pxsz],prow,dd,header->width*pxsz,pxsz);
         prow = dd+1;
         dd = dd+(header->width*pxsz+1);
     }
