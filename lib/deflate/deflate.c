@@ -351,7 +351,8 @@ int deflate(bitarray* bBuffer, uint8_t* data,size_t input_sz){
     int HCLEN = max_cl-3;
 
     LOG_I("HLIT:%d HDIST:%d HCLEN:%d\n",HLIT,HDIST,HCLEN);
-    packbits(bh,1,1);      /*BFINAL =1*/
+    int is_final = (pos >= input_size) ? 1 : 0;
+    packbits(bh,is_final,1);      /*BFINAL =1*/
     PRINT_BINARY(1,1);
 
     packbits(bh,2,2);      /*BTYPE = 10*/
@@ -395,7 +396,7 @@ int deflate(bitarray* bBuffer, uint8_t* data,size_t input_sz){
         next_pos = lzss_ptrs[0].position;
     }
 
-    while(i<input_size){
+    while(i<pos){
         if(i==next_pos){
             LOG_V("LZSS match at pos %ld: length=%lu distance=%lu\n",i,lzss_ptrs[next_ptr].length,lzss_ptrs[next_ptr].distance);
             sym = lzss_ptrs[next_ptr].length;

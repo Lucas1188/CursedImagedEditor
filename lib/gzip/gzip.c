@@ -43,7 +43,7 @@ uint32_t write_gzip_from_file(const char* filename, bitarray* bData) {
     FILE* f;
     uint8_t* fbuffer;
     uint32_t crc_cs;
-    size_t file_sz;
+    size_t file_sz,total_compressed = 0;
     make_gzip_header(&header);
     packbytes_aligned(bData, (uint8_t*)&header, 10);
 
@@ -70,11 +70,15 @@ uint32_t write_gzip_from_file(const char* filename, bitarray* bData) {
         return -1;
     }
     fclose(f);
-    processed = deflate(bData, (uint8_t*)fbuffer, file_sz);
-    if (processed < 0) {
-        LOG_E("Compression failed\n");
-        free(fbuffer);
-        return -1;
+    while(total_compressed<file_sz){
+        processed = deflate(bData, fbuffer+total_compressed, file_sz-total_compressed);
+        if (processed <= 0) {
+            LOG_E("Compression failed\n");
+            free(fbuffer);
+            return -1;
+        }
+        total_compressed += processed;
+        LOG_I("Chunk compressed: %ld bytes (Total: %ld/%ld)\n", processed, total_compressed, file_sz);
     }
     bitarray_flush(bData);
     make_gzip_footer(&footer, crc_cs ,file_sz);

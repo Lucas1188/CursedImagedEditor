@@ -89,7 +89,7 @@ int generate_lzss_pointers(uint8_t* input,long int input_size,slzss_pointer* lzs
   uint16_t symbol=0;
   uint8_t* s;
   ptr_count = 0;
-  for(pos = 0; pos < (input_size - MIN_MATCH); pos++){
+  for(pos = 0; pos < input_size; pos++){
     dist = 0;
     remaining = input_size - pos;
     maxlen = remaining < LOOKAHEAD_SIZE ? remaining : LOOKAHEAD_SIZE;
@@ -121,6 +121,7 @@ int generate_lzss_pointers(uint8_t* input,long int input_size,slzss_pointer* lzs
       /*printf("%c",input[pos]);*/
     }
     if(ptr_count==ptr_n){
+      pos++;
       break;
     }
   }
