@@ -112,35 +112,60 @@ int make_idat_chunks(const ihdr_chunk* header, const uint8_t* rawpx, const size_
     LOG_I("Creating Deflate\n");
     dd = write_b;
     
-    do{
-        *idat_s = (idat_chunk**)realloc(*idat_s,nchunk*sizeof(idat_chunk*));
-        LOG_I("Realloc idat_s with chunk n = %ld\n",nchunk);
-        current_chunk = (idat_chunk*) calloc(1,sizeof(idat_chunk));
-        (*idat_s)[nchunk-1] = current_chunk;
-        LOG_I("Start Deflate\n");
-        wdat = deflate(&cba,dd,deflatedat);
-        if(wdat<=0){
-            LOG_E("[PNG] DEFLATE failed with %ld remaining from %ld\n",deflatedat,tidat);
+    /* 1. Run deflate until all raw data is consumed into the single cba bitarray */
+    do {
+        LOG_I("Start Deflate pass\n");
+        wdat = deflate(&cba, dd, deflatedat);
+        if(wdat <= 0) {
+            LOG_E("[PNG] DEFLATE failed with %ld remaining from %ld\n", deflatedat, tidat);
             break;
         }   
-        bitarray_flush(&cba);
-        deflatedat-=wdat;
-
-        LOG_I("End Deflate with compressed len: %ld rem: %ld\n", cba.used, deflatedat);
-
-        current_chunk->sz = cba.used;
-        current_chunk->data = cba.data;
+        deflatedat -= wdat;
         dd += wdat;
+    } while(deflatedat > 0);
+    
+    bitarray_flush(&cba);
+    LOG_I("End Deflate with total compressed len: %ld\n", cba.used);
+
+    /* 2. Append ADLER32 checksum */
+    LOG_I("AD32: %x\n", ad32);
+    /* ZLIB spec requires Adler32 to be Big-Endian */
+    uint32_t ad32_be = bswap32(ad32); 
+    packbytes_aligned(&cba, (uint8_t*)&ad32_be, sizeof(ad32_be));
+
+    /* 3. Slice the completed ZLIB stream into separate IDAT chunks */
+    size_t max_idat_size = 32768; /* Standard chunk size (can safely be up to 65536) */
+    size_t remaining_bytes = cba.used;
+    uint8_t* cba_ptr = cba.data;
+    nchunk = 0; /* Reset and use as a standard 0-indexed counter */
+
+    while(remaining_bytes > 0) {
+        size_t chunk_sz = (remaining_bytes > max_idat_size) ? max_idat_size : remaining_bytes;
+
+        *idat_s = (idat_chunk**)realloc(*idat_s, (nchunk + 1) * sizeof(idat_chunk*));
+        current_chunk = (idat_chunk*)calloc(1, sizeof(idat_chunk));
+        (*idat_s)[nchunk] = current_chunk;
+
+        current_chunk->sz = chunk_sz;
+        /* Allocate isolated memory for this chunk to prevent double-frees later */
+        current_chunk->data = (uint8_t*)malloc(chunk_sz);
+        memcpy(current_chunk->data, cba_ptr, chunk_sz);
+
+        cba_ptr += chunk_sz;
+        remaining_bytes -= chunk_sz;
         nchunk++;
-    }while(deflatedat>0);
-    LOG_I("Wrote %ld bytes to deflate stream with %ld chunks\n",tidat,nchunk-1);
-    LOG_I("AD32: %x\n",ad32);
-    packbytes_aligned(&cba,(uint8_t*)&ad32,sizeof(ad32));
-    current_chunk->sz = cba.used;
+    }
+
+    LOG_I("Wrote %ld bytes to deflate stream across %ld IDAT chunks\n", tidat, nchunk);
+
+    /* Clean up the temporary bitarray buffer since we copied the data out */
+    if (cba.data) {
+        free(cba.data);
+    }
 
     free(upperpad_);
     free(write_b);
-    return nchunk-1;
+    return nchunk;
 }
 
 void encapsulate_idatchunks(png_s* p,idat_chunk** chunks, size_t nchunks){
