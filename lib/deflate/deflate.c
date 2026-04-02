@@ -261,7 +261,7 @@ int deflate(bitarray* bBuffer, uint8_t* data,size_t input_sz){
     long *r;
     uint16_t codetable[HUFFMAN_ALPHABET_SZ],sym,lcode;
     huffnode* cnodes[HUFFMAN_ALPHABET_SZ],*dnodes[29],*clnodes[18];
-    slzss_pointer lzss_ptrs[WINDOW_SIZE];
+    slzss_pointer lzss_ptrs[WINDOW_SIZE]; /*Keep LZSS pointers on the stack--> TODO: ensure chunking works correctly with this*/
     huffmancoder o_huffman,cl_huffman,d_huffman;
     bitarray* bh;
     
