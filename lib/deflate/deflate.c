@@ -327,7 +327,7 @@ int deflate(bitarray* bBuffer, uint8_t* data,size_t input_sz){
         count_clcodes(compressedlens[i].sym);
         LOG_V("%ld %d\n",i,compressedlens[i].sym);
     }
-    create_table(&cl_huffman,clnodes,nc,15);
+    create_table(&cl_huffman,clnodes,nc,7);
     
     /*Write Header*/
     LOG_I("\n\n==========Header===========\n");
