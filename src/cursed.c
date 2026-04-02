@@ -71,85 +71,59 @@ int main(int argc, char* argv[]) {
     do_grey = has_flag(argc, argv, "-grey");
     do_png  = has_flag(argc, argv, "-png");
     do_gzip = has_flag(argc, argv, "-gzip");
-    tmp_path = do_png ? "/tmp/cursed_intermediate.png" : "/tmp/cursed_intermediate.bmp";
-
-    bmp = read_bitmap(argv[1]);
-    if (!bmp) {
-        LOG_E("Failed to read bitmap: %s\n", argv[1]);
-        return 1;
+    
+    if(do_grey || do_png){
+        bmp = read_bitmap(argv[1]);
+        if (!bmp) {
+            LOG_E("Failed to read bitmap: %s\n", argv[1]);
+            return 1;
+        }
     }
+    if(do_grey){
+        img = bitmap_to_cursed(bmp);
+        free_bitmap(bmp);
+        if (!img) {
+            LOG_E("Failed to convert bitmap to internal format\n");
+            return 1;
+        }
 
-    img = bitmap_to_cursed(bmp);
-    free_bitmap(bmp);
-    if (!img) {
-        LOG_E("Failed to convert bitmap to internal format\n");
-        return 1;
-    }
-
-    if (do_grey) {
         cursed_greyscale(img);
+        
+        out_bmp = cursed_to_bitmap(img);
+        RELEASE_CURSED_IMG(*img);
+        free(img);
+        if (!out_bmp) {
+            LOG_E("Failed to convert image to output bitmap\n");
+            return 1;
+        }
+        if(!do_png && !do_gzip){
+             if (!write_bitmap(out_bmp, argv[2])) {
+                free_bitmap(out_bmp);
+                return 1;
+            }
+            free_bitmap(out_bmp);
+            return 0;
+        }
     }
-
-    out_bmp = cursed_to_bitmap(img);
-    RELEASE_CURSED_IMG(*img);
-    free(img);
-    if (!out_bmp) {
-        LOG_E("Failed to convert image to output bitmap\n");
-        return 1;
-    }
-
+    
     if (do_png) {
-        ihdr.width              = out_bmp->width;
-        ihdr.height             = out_bmp->height;
-        ihdr.bit_depth          = 8;
-        ihdr.color_type         = CT_RGB_ALPHA;
-        ihdr.compression_method = 0;
-        ihdr.filter_method      = FILTER_NONE;
-        ihdr.interlace_method   = INTL_NONE;
-
+        ihdr = IHDR_TRUECOLOR8_A8(out_bmp->width, out_bmp->height);
         png = create_png(&ihdr, out_bmp->pixels, 4);
-        free_bitmap(out_bmp);
         if (!png) {
             LOG_E("Failed to create PNG\n");
             return 1;
         }
-
-        if (do_gzip) {
-            if (write_png(tmp_path, png) != 0) {
-                free_png(png);
-                return 1;
-            }
+        if (write_png(argv[2], png) != 0) {
             free_png(png);
-            if (!gzip_file_to(tmp_path, argv[2])) {
-                remove(tmp_path);
-                return 1;
-            }
-            remove(tmp_path);
-        } else {
-            if (write_png(argv[2], png) != 0) {
-                free_png(png);
-                return 1;
-            }
-            free_png(png);
-        }
-    } else if (do_gzip) {
-        if (!write_bitmap(out_bmp, tmp_path)) {
-            free_bitmap(out_bmp);
             return 1;
         }
-        free_bitmap(out_bmp);
-        if (!gzip_file_to(tmp_path, argv[2])) {
-            remove(tmp_path);
-            return 1;
-        }
-        remove(tmp_path);
-    } else {
-        if (!write_bitmap(out_bmp, argv[2])) {
-            free_bitmap(out_bmp);
-            return 1;
-        }
-        free_bitmap(out_bmp);
+        free_png(png);
     }
+    if (do_gzip) {
+        if (!gzip_file_to(argv[1], argv[2])) {
+            return 1;
+        }
+    } 
 
     return 0;
 }

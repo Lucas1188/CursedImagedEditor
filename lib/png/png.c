@@ -197,7 +197,6 @@ png_s* create_png(const ihdr_chunk* header, const uint8_t* rawpx, const size_t p
     idat_chunk** idat_c_ptrs = NULL;
     p->n_idatchunks = make_idat_chunks(header, rawpx, pxsz, &idat_c_ptrs);
     encapsulate_idatchunks(p, idat_c_ptrs, p->n_idatchunks);
-    free(idat_c_ptrs);
     return p;
 }
 
@@ -213,7 +212,37 @@ int free_png(png_s* p){
     free(p);
     return 0;
 }
-
+#ifdef TEST_PNGDRIVER
+int main(int argv, char** argc){
+    ihdr_chunk ihdr;
+    uint8_t* px;
+    size_t i,h,w;
+    png_s* png;
+    h = 400; w = 400;
+    px = (uint8_t*)calloc(4*h*w, sizeof(uint8_t));
+    /*Make Red*/
+    LOG_I("Calloc Raw bytes\n");
+    for(i=0;i<h*w;i++){
+            /* Indexing: [R, G, B, A]*/
+        px[i*4]     = i*96979%0xFF; /* Red*/           
+        px[i*4 + 1] = i*w*104729<<i/h%0xFF;               /* Green*/
+        px[i*4 + 2] = i/w/2;               /* Blue*/
+        px[i*4 + 3] = 0xFF; /* Alpha (MUST be set to see the color)*/
+    }
+    ihdr = IHDR_TRUECOLOR8_A8(w, h);
+    png = create_png(&ihdr, (uint8_t*)px, 4);
+    if (!png) {
+        LOG_E("Failed to create PNG\n");
+        return 1;
+    }
+    if (write_png(argc[1], png) != 0) {
+        free_png(png);
+        return 1;
+    }
+    free_png(png);
+    return 0;   
+}
+#endif
 #ifdef STANDALONE_PNG
 int main(int argv, char** argc){
     
@@ -233,13 +262,13 @@ int main(int argv, char** argc){
     LOG_I("Calloc Raw bytes\n");
     for(i=0;i<h*w;i++){
             /* Indexing: [R, G, B, A]*/
-        if(i%2==0)  px[i*4]     = 0x00FF; /* Red*/           
-        if(i%2==1)  px[i*4 + 1] = 0xFF00;               /* Green*/
-        px[i*4 + 2] = 0;               /* Blue*/
+        px[i*4]     = i*96979%0xFFFF; /* Red*/           
+        px[i*4 + 1] = i*w*104729<<i/h%0xFFFF;               /* Green*/
+        px[i*4 + 2] = i/w/2;               /* Blue*/
         px[i*4 + 3] = 0xFFFF; /* Alpha (MUST be set to see the color)*/
     }
     LOG_I("Creating Header\n");
-    ihdrc = IHDR_TRUECOLOR16_A16(h,w);
+    ihdrc = IHDR_TRUECOLOR16_A16(w,h);
     LOG_I("Wrote Header\n");
     p = create_png_container(ihdrc);
     LOG_I("Writing chunks\n");

@@ -1,7 +1,7 @@
 # Makefile for building lib/zlib/zlib.c with all dependencies in lib/
 
 CC = gcc
-CFLAGS = -ansi -Werror -Ilib -DSTANDALONE_PNG
+CFLAGS = -ansi -Werror -Ilib $(DFLAGS)
 
 # Target executable
 TARGET = png
