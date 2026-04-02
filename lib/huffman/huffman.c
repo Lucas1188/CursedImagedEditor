@@ -320,158 +320,84 @@ void print_kraft_overflow(huffcode** code_list, size_t n, int maxbits)
 }
 void limit_code_length(huffcode** code_list, size_t n, size_t maxbits)
 {
-    int bl_count[MAX_CODELEN];
-    unsigned long total = 0;
-    unsigned long max_weight;
-    size_t i;
-    int len, bits, count;
-    size_t idx;
-
-    /* Initialize bl_count array */
-    for (i = 0; i < MAX_CODELEN; i++) {
-        bl_count[i] = 0;
-    }
-
-    /* 1. Initial Capping & Weight Calculation */
-    for (i = 0; i < n; i++) {
-        if (code_list[i]->codelen > (unsigned short)maxbits) {
-            code_list[i]->codelen = (unsigned short)maxbits;
-        }
-        bl_count[code_list[i]->codelen]++;
-    }
-
-    for (len = 1; len <= (int)maxbits; len++) {
-        total += ((unsigned long)bl_count[len] << (maxbits - len));
-    }
-
-    max_weight = 1UL << maxbits;
-
-    /* 2. Adjust if overfull: Move nodes deeper (increase length) 
-       This reduces total weight because 2^(-(L+1)) < 2^(-L) */
-    while (total > max_weight) {
-        /* Find the shortest code to push down */
-        for (bits = (int)maxbits - 1; bits > 0; bits--) {
-            if (bl_count[bits] > 0) {
-                bl_count[bits]--;
-                bl_count[bits + 1]++;
-                
-                /* Weight change: We lose 2^(max-bits), gain 2^(max-(bits+1))
-                   Result: total -= 2^(max-bits-1) */
-                total -= (1UL << (maxbits - bits - 1));
-                break;
-            }
-        }
-    }
-
-    /* 3. Adjust if underfull: Move nodes up (decrease length)
-       Required for canonical Huffman to ensure no "holes" in the prefix space */
-    while (total < max_weight) {
-        /* Find the deepest code to pull up */
-        for (bits = (int)maxbits; bits > 1; bits--) {
-            if (bl_count[bits] > 0) {
-                /* Check if pulling up fits in max_weight */
-                unsigned long weight_gain = (1UL << (maxbits - bits + 1)) - (1UL << (maxbits - bits));
-                /* Simplifies to: 1UL << (maxbits - bits) */
-                
-                if (total + (1UL << (maxbits - bits)) <= max_weight) {
-                    bl_count[bits]--;
-                    bl_count[bits - 1]++;
-                    total += (1UL << (maxbits - bits));
-                    break;
-                }
-            }
-        }
-        /* If no more moves possible, break to avoid infinite loop */
-        if (bits <= 1) break; 
-    }
-
-    /* 4. Assign lengths back to sorted list (Freq ASC)
-       Smallest frequencies (index 0) get the longest codes (maxbits) */
-    idx = 0;
-    for (len = (int)maxbits; len >= 1; len--) {
-        count = bl_count[len];
-        while (count > 0 && idx < n) {
-            code_list[idx++]->codelen = (unsigned short)len;
-            count--;
-        }
-    }
-}
-/*
-void limit_code_length(huffcode** code_list, size_t n, size_t maxbits)
-{
-    size_t i;
-
     int bl_count[MAX_CODELEN] = {0};
-    LOG_I("Kraft before limiting:\n");
-    print_kraft(code_list, n);
+    size_t i;
+    int bits;
+
+    /* RFC 1951 Special Case: Single symbol alphabet */
+    if (n <= 1) {
+        if (n == 1) code_list[0]->codelen = 1;
+        return;
+    }
+
+    /* 1. Cap lengths and count initial weights */
+    unsigned long total_weight = 0;
+    unsigned long target_weight = 1UL << maxbits;
 
     for (i = 0; i < n; i++) {
         int len = code_list[i]->codelen;
-        if (len >= MAX_CODELEN) len = MAX_CODELEN - 1;
+        if (len > maxbits) {
+            len = maxbits;
+        }
         bl_count[len]++;
     }
 
-    int overflow = 0;
-    for (i = maxbits + 1; i < MAX_CODELEN; i++) {
-        overflow += bl_count[i];
+    /* Calculate the initial Kraft sum in integer units */
+    for (bits = 1; bits <= maxbits; bits++) {
+        total_weight += (unsigned long)bl_count[bits] << (maxbits - bits);
     }
-    
-    while (overflow > 0) {
-        int bits = maxbits - 1;
-        while (bits > 0 && bl_count[bits] == 0)
+
+    /* 2. Resolve Oversubscription (Kraft sum > 1) */
+    while (total_weight > target_weight) {
+        /* Find the deepest code < maxbits to push down */
+        bits = maxbits - 1;
+        while (bits > 0 && bl_count[bits] == 0) {
             bits--;
-
-        if (bits == 0) break;
-
-        bl_count[bits]--;
-        bl_count[bits + 1] += 2;
-
-        overflow--;
-    }
-   
-
-    for (i = maxbits + 1; i < MAX_CODELEN; i++) {
-        bl_count[i] = 0;
-    }
-
-    int left = 1 << maxbits;
-
-    for (i = 1; i <= maxbits; i++) {
-        left -= bl_count[i] << (maxbits - i);
-    }
-
-    while (left > 0) {
-        int bits;
-        for (bits = maxbits; bits > 1; bits--) {
-            if (bl_count[bits] > 0) {
-                bl_count[bits]--;
-                bl_count[bits - 1] += 2;
-
-                left -= 1 << (maxbits - (bits - 1));
-                break;
-            }
         }
 
-        if (bits == 1) break;
+        if (bits == 0) {
+            LOG_E("Fatal: Cannot resolve Kraft inequality.\n");
+            break; 
+        }
+
+        bl_count[bits]--;          /* Take a node from the higher level... */
+        bl_count[bits + 1] += 2;   /* ...split it into two at the next level down. */
+        bl_count[maxbits]--;       /* Remove one leaf from the bottom to maintain count = n. */
+        
+        total_weight--; /* This exact shift mathematically reduces the Kraft sum by exactly 1 unit */
     }
+
+    /* Required to prevent infgen's "code lengths code is incomplete" error */
+    while (total_weight < target_weight) {
+        /* Find the deepest code we can pull up without overshooting the target */
+        for (bits = maxbits; bits > 1; bits--) {
+            if (bl_count[bits] > 0) {
+                unsigned long weight_gain = 1UL << (maxbits - bits);
+                
+                if (total_weight + weight_gain <= target_weight) {
+                    bl_count[bits]--;      /* Remove deeper code */
+                    bl_count[bits - 1]++;  /* Promote to shallower level */
+                    
+                    total_weight += weight_gain;
+                    break; /* Recalculate from the bottom */
+                }
+            }
+        }
+        /* If we can't find a valid move, break to avoid infinite loops */
+        if (bits <= 1) break; 
+    }
+
+    /* code_list MUST be sorted by FREQUENCY ASCENDING before this loop! */
     size_t idx = 0;
-    int len, count;
-
-    for (len = 1; len <= (int)maxbits; len++) {
-        count = bl_count[len];
-
+    for (bits = maxbits; bits >= 1; bits--) {
+        int count = bl_count[bits];
         while (count > 0 && idx < n) {
-            code_list[idx++]->codelen = len;
+            code_list[idx]->codelen = bits;
+            idx++;
             count--;
         }
     }
-    if (idx != n) {
-        LOG_E("Mismatch after limiting: idx=%ld, n=%ld\n", idx, n);
-    }
-    LOG_I("Kraft after limiting:\n");
-    print_kraft(code_list, n);
 }
-*/
 void decode_bitstream(huffmancoder* hobj, unsigned char* data, size_t size, fdecode_symbol_fn fdsym)
 {
   int bytepos;
