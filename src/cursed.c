@@ -8,6 +8,7 @@
 #include "../lib/cursedlib/image/filters/greyscale.h"
 #include "../lib/png/png.h"
 #include "../lib/gzip/gzip.h"
+#include "../include/cursedtui.h"
 
 static void print_usage(const char* prog) {
     fprintf(stderr,
@@ -21,7 +22,7 @@ static void print_usage(const char* prog) {
 
 static int has_flag(int argc, char* argv[], const char* flag) {
     int i;
-    for (i = 3; i < argc; i++) {
+    for (i = 0; i < argc; i++) {
         if (strcmp(argv[i], flag) == 0) return 1;
     }
     return 0;
@@ -60,18 +61,23 @@ int main(int argc, char* argv[]) {
     bitmap*     out_bmp;
     png_s*      png;
     ihdr_chunk  ihdr;
-    int         do_grey, do_png, do_gzip;
+    int         do_grey, do_png, do_gzip,do_interactive;
     const char* tmp_path;
+
+    do_grey = has_flag(argc, argv, "-grey");
+    do_png  = has_flag(argc, argv, "-png");
+    do_gzip = has_flag(argc, argv, "-gzip");
+    do_interactive = has_flag(argc, argv, "-i");
+    
+    if(do_interactive){
+        return interactive_mode();
+    }
 
     if (argc < 3) {
         print_usage(argv[0]);
         return 1;
     }
 
-    do_grey = has_flag(argc, argv, "-grey");
-    do_png  = has_flag(argc, argv, "-png");
-    do_gzip = has_flag(argc, argv, "-gzip");
-    
     if(do_grey || do_png){
         bmp = read_bitmap(argv[1]);
         if (!bmp) {
