@@ -57,7 +57,7 @@ typedef struct{
         .height = (h), \
         .width = (w), \
         .px_fmt = CURSED_RGBA64_PXFMT, \
-        .pxs = malloc((w)*(h)*sizeof(tcursed_pix)) \
+        .pxs = calloc((w)*(h)*sizeof(tcursed_pix), 1) \
     })
 
 #define RELEASE_CURSED_IMG(img) do { \

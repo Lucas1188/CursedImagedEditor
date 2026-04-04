@@ -85,7 +85,7 @@ int make_idat_chunks(const ihdr_chunk* header, const uint8_t* rawpx, const size_
     for(;row<header->height;row++){
         LOG_I("Row %ld\n",row);
         filter_row(&rawpx[row*header->width*pxsz],prow,dd,header->width*pxsz,pxsz);
-        prow = dd+1;
+        prow = dd;
         dd = dd+(header->width*pxsz+1);
     }
     deflatedat = (header->height)*(header->width*pxsz+1);
