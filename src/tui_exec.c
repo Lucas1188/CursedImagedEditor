@@ -11,8 +11,6 @@
 #include "../lib/bitmap/bitmap.h"
 #include "../lib/bitmap/bitmap_cursed.h"
 #include "../lib/png/png.h"
-/* IMPORTANT: Include your drawing header so draw_rectangle is defined! */
-/* #include "../lib/cursedlib/image/draw/draw.h" */
 
 #define MAX_FILES 50
 static char file_cache[MAX_FILES][256] = {0};
@@ -54,6 +52,48 @@ static void print_directory_list() {
     add_log("-----------------------");
 }
 
+/* ANSI C Compliant Helper: Centers an image inside the global canvas dimensions */
+static cursed_img* fit_to_canvas(cursed_img* src, int target_w, int target_h) {
+    cursed_img* dest;
+    int offset_x, offset_y, y, x, dest_x, dest_y;
+    
+    dest = (cursed_img*)malloc(sizeof(cursed_img));
+    if (!dest) return NULL;
+    
+    dest->width = target_w;
+    dest->height = target_h;
+    memcpy(&dest->px_fmt, &src->px_fmt, sizeof(src->px_fmt)); /* Safely copy the format struct */
+    dest->pxs = (tcursed_pix*)malloc(target_w * target_h * sizeof(tcursed_pix));
+    
+    if (!dest->pxs) {
+        free(dest);
+        return NULL;
+    }
+    
+    /* Wipe the new image completely transparent (0) */
+    memset(dest->pxs, 0, target_w * target_h * sizeof(tcursed_pix));
+    
+    /* Calculate centering offsets (can be negative if source is larger than canvas) */
+    offset_x = (target_w - src->width) / 2;
+    offset_y = (target_h - src->height) / 2;
+    
+    /* Copy the pixels over */
+    for (y = 0; y < src->height; y++) {
+        for (x = 0; x < src->width; x++) {
+            dest_x = x + offset_x;
+            dest_y = y + offset_y;
+            
+            /* Only copy if the pixel falls within the canvas bounds. 
+               This naturally handles both padding (smaller) and cropping (larger) */
+            if (dest_x >= 0 && dest_x < target_w && dest_y >= 0 && dest_y < target_h) {
+                dest->pxs[dest_y * target_w + dest_x] = src->pxs[y * src->width + x];
+            }
+        }
+    }
+    
+    return dest;
+}
+
 int execute_command(CommandAST ast) {
     char msg_buffer[128];
     int i;
@@ -71,13 +111,16 @@ int execute_command(CommandAST ast) {
             {
                 char target_file[256] = {0};
                 int is_num = 1;
+                const char* arg_str;
+                cursed_img* loaded_img;
                 
                 if (ast.num_args < 1) {
                     print_directory_list();
                     add_log("Tip: Type 'load <number>' or 'load <filename>'");
                     return 1;
                 }
-                const char* arg_str = get_arg_str(&ast, 0, "");
+                
+                arg_str = get_arg_str(&ast, 0, "");
                 for(i = 0; i < strlen(arg_str); i++) {
                     if(!isdigit(arg_str[i])) { is_num = 0; break; }
                 }
@@ -101,12 +144,37 @@ int execute_command(CommandAST ast) {
                     return 1;
                 }
 
-                cursed_img* loaded_img = bitmap_to_cursed(temp_bmp);
+                loaded_img = bitmap_to_cursed(temp_bmp);
                 free_bitmap(temp_bmp); 
 
                 if (!loaded_img) {
                     add_log("Error: Failed to convert bitmap to internal format.");
                     return 1;
+                }
+
+                /* --- NEW: CENTERING & FITTING LOGIC --- */
+                if (canvas_width == 0 && canvas_height == 0) {
+                    /* First image loaded sets the master canvas size */
+                    canvas_width = loaded_img->width;
+                    canvas_height = loaded_img->height;
+                } else if (loaded_img->width != canvas_width || loaded_img->height != canvas_height) {
+                    /* Image doesn't match canvas: Center and pad/crop it */
+                    cursed_img* resized_img = fit_to_canvas(loaded_img, canvas_width, canvas_height);
+                    
+                    if (!resized_img) {
+                        add_log("Error: Out of memory trying to fit image to canvas.");
+                        RELEASE_CURSED_IMG(*loaded_img);
+                        free(loaded_img);
+                        return 1;
+                    }
+                    
+                    /* Clean up the original raw image and point to the formatted one */
+                    RELEASE_CURSED_IMG(*loaded_img);
+                    free(loaded_img);
+                    loaded_img = resized_img;
+                    
+                    snprintf(msg_buffer, sizeof(msg_buffer), "Notice: Image fitted to canvas (%dx%d)", canvas_width, canvas_height);
+                    add_log(msg_buffer);
                 }
 
                 for (i = 0; i < MAX_LAYERS; i++) {
@@ -165,19 +233,48 @@ int execute_command(CommandAST ast) {
             }
             memset(layers, 0, sizeof(layers));
             selected_layer_idx = -1;
-            add_log("-> Cleared all layers and freed memory.");
+            canvas_width = 0;  /* <-- Reset Canvas */
+            canvas_height = 0; /* <-- Reset Canvas */
+            add_log("-> Cleared all layers and reset canvas.");
             break;
 
         case CMD_NEW:
             {
-                int w = get_arg_int(&ast, 0, 512);
-                int h = get_arg_int(&ast, 1, 512);
-                const char* custom_name = get_arg_str(&ast, 2, "Blank");
+                int w = 512, h = 512;
+                const char* custom_name = "Blank";
 
-                if (w <= 0 || h <= 0 || w > 8192 || h > 8192) {
-                    add_log("Error: Dimensions must be between 1 and 8192."); return 1;
+                /* --- SMART CANVAS ARGUMENT PARSING --- */
+                if (canvas_width > 0 && canvas_height > 0) {
+                    /* Canvas is LOCKED. Width/Height are ignored. */
+                    w = canvas_width;
+                    h = canvas_height;
+                    
+                    /* If they only provided 1 argument (e.g., 'new shadow'), treat it as the name */
+                    if (ast.num_args == 1) {
+                        custom_name = get_arg_str(&ast, 0, "Blank");
+                    } 
+                    /* If they still typed 'new 800 600 shadow', extract the 3rd arg */
+                    else if (ast.num_args >= 3) {
+                        custom_name = get_arg_str(&ast, 2, "Blank");
+                        snprintf(msg_buffer, sizeof(msg_buffer), "Notice: Enforcing canvas size (%dx%d).", canvas_width, canvas_height);
+                        add_log(msg_buffer);
+                    }
+                } else {
+                    /* Canvas is EMPTY. We need Width and Height. */
+                    w = get_arg_int(&ast, 0, 512);
+                    h = get_arg_int(&ast, 1, 512);
+                    custom_name = get_arg_str(&ast, 2, "Blank");
+                    
+                    /* Lock the canvas for future layers */
+                    canvas_width = w;
+                    canvas_height = h;
                 }
 
+                if (w <= 0 || h <= 0 || w > 8192 || h > 8192) {
+                    add_log("Error: Dimensions must be between 1 and 8192."); 
+                    return 1;
+                }
+                
                 int layer_slot = -1;
                 for (i = 0; i < MAX_LAYERS; i++) {
                     if (!layers[i].is_active) { layer_slot = i; break; }
@@ -295,47 +392,69 @@ int execute_command(CommandAST ast) {
         case CMD_EVAL:
             {
                 char eval_str[256];
+                char dest_name[64] = {0};
+                char* eq_ptr;
+                int p_idx = 0, j = 0;
+                int dest_id;
+
                 strncpy(eval_str, ast.args[0], 255); eval_str[255] = 0;
 
-                char* eq_ptr = strchr(eval_str, '=');
+                eq_ptr = strchr(eval_str, '=');
                 if (!eq_ptr) { add_log("Error: Missing '='."); return 1; }
                 *eq_ptr = '\0'; 
 
-                int dest_id;
-                if (sscanf(eval_str, " l%d", &dest_id) != 1 || dest_id < 0 || dest_id >= MAX_LAYERS) {
-                    add_log("Error: Invalid destination layer format (e.g., 'l3')."); return 1;
+                /* 1. Extract and trim the custom destination name */
+                while (eval_str[p_idx] == ' ' || eval_str[p_idx] == '\t') p_idx++; 
+                while (eval_str[p_idx] && eval_str[p_idx] != ' ' && eval_str[p_idx] != '\t') {
+                    if (j < 63) dest_name[j++] = eval_str[p_idx];
+                    p_idx++;
+                }
+                dest_name[j] = '\0';
+
+                if (strlen(dest_name) == 0) { add_log("Error: No destination layer name."); return 1; }
+
+                /* 2. Find existing layer or grab a new slot */
+                dest_id = get_layer_idx_by_name(dest_name);
+                if (dest_id == -1) {
+                    for (i = 0; i < MAX_LAYERS; i++) {
+                        if (!layers[i].is_active) { dest_id = i; break; }
+                    }
+                    if (dest_id == -1) { add_log("Error: Max layers reached."); return 1; }
                 }
 
+                /* 3. Initialize AST */
                 ASTNode* root = init_and_parse_ast(eq_ptr + 1);
                 if (!root) { add_log("Error: Syntax error or equation too complex."); return 1; }
 
-                int target_w = -1, target_h = -1;
-                if (!check_ast_layers(root, &target_w, &target_h)) {
-                    add_log("Error: Referenced layers missing or dimensions do not match."); return 1;
+                if (!check_ast_layers(root, &canvas_width, &canvas_height)) {
+                    add_log("Error: Referenced layers missing or dimensions mismatch."); return 1;
                 }
-                if (target_w == -1) { add_log("Error: No layers referenced."); return 1; }
 
+                /* 4. Prepare Destination Memory */
                 cursed_img* dest_img = NULL;
                 if (layers[dest_id].is_active) {
                     dest_img = layers[dest_id].img_data;
-                    if (dest_img->width != target_w || dest_img->height != target_h) {
-                        add_log("Error: Destination dimensions do not match sources."); return 1;
-                    }
                 } else {
                     dest_img = (cursed_img*)malloc(sizeof(cursed_img));
-                    dest_img->width = target_w;
-                    dest_img->height = target_h;
+                    dest_img->width = canvas_width;
+                    dest_img->height = canvas_height;
                     memcpy(&dest_img->px_fmt, &(spixel_fmt)CURSED_RGBA64_PXFMT, sizeof(spixel_fmt));
-                    dest_img->pxs = (tcursed_pix*)malloc(target_w * target_h * sizeof(tcursed_pix));
+                    dest_img->pxs = (tcursed_pix*)malloc(canvas_width * canvas_height * sizeof(tcursed_pix));
+                    
+                    /* Wipe garbage RAM to pure transparency */
+                    memset(dest_img->pxs, 0, canvas_width * canvas_height * sizeof(tcursed_pix));
                     
                     layers[dest_id].is_active = 1;
                     layers[dest_id].img_data = dest_img;
-                    snprintf(layers[dest_id].name, 63, "Eval_Result");
+                    
+                    /* Give it the exact name they typed! */
+                    strncpy(layers[dest_id].name, dest_name, 63); 
                 }
                 layers[dest_id].op_count++;
 
-                size_t total_pixels = target_w * target_h;
-                size_t p_idx;
+                /* 5. Fire AST across all pixels... */
+
+                size_t total_pixels = canvas_width * canvas_height;
                 for (p_idx = 0; p_idx < total_pixels; p_idx++) {
                     RGBFloat final_color = eval_ast(root, p_idx);
                     uint16_t* dest_channels = (uint16_t*)&(dest_img->pxs[p_idx]);

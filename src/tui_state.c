@@ -10,6 +10,10 @@ int log_count = 0;
 tcursed_pix current_color;
 void (*cursed_log_callback)(const char* msg) = NULL;
 
+/* ... below int selected_layer_idx = -1; ... */
+int canvas_width = 0;
+int canvas_height = 0;
+
 void clear_screen() {
     printf("\033[2J\033[H");
 }
@@ -34,4 +38,12 @@ tcursed_pix make_pixel(uint16_t r, uint16_t g, uint16_t b, uint16_t a) {
     px |= ((uint64_t)b << 32);
     px |= ((uint64_t)a << 48);
     return (tcursed_pix)px;
+}
+
+int get_layer_idx_by_name(const char* name) {
+    int i;
+    for (i = 0; i < MAX_LAYERS; i++) {
+        if (layers[i].is_active && strcmp(layers[i].name, name) == 0) return i;
+    }
+    return -1; /* Layer not found */
 }

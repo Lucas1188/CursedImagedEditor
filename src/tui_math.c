@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <string.h>
 #include "../include/tui_math.h"
 
 /* Static internals only visible to the math engine */
@@ -25,20 +26,40 @@ static ASTNode* parse_ast_factor() {
         n = parse_ast_expr();
         ast_skip_space();
         if (*parse_ptr == ')') parse_ptr++;
-    } else if (*parse_ptr == '-') {
+    } else if (*parse_ptr == '-') { 
         parse_ptr++; ast_skip_space();
         n = make_node(AST_OP_SUB);
         ASTNode* zero = make_node(AST_CONST); zero->value = 0.0f;
         n->left = zero; n->right = parse_ast_factor();
-    } else if (*parse_ptr == 'l') {
-        parse_ptr++;
-        n = make_node(AST_LAYER);
-        n->value = atof(parse_ptr);
-        while (*parse_ptr >= '0' && *parse_ptr <= '9') parse_ptr++;
     } else {
-        n = make_node(AST_CONST);
-        n->value = atof(parse_ptr);
-        while ((*parse_ptr >= '0' && *parse_ptr <= '9') || *parse_ptr == '.') parse_ptr++;
+        /* --- NEW LEXER LOGIC --- */
+        char token[64] = {0};
+        int i = 0;
+        char* endptr;
+        double val;
+        
+        /* Read the string until we hit a space or mathematical operator */
+        while (*parse_ptr && *parse_ptr != ' ' && *parse_ptr != '\t' && 
+               *parse_ptr != '+' && *parse_ptr != '-' && 
+               *parse_ptr != '*' && *parse_ptr != '/' && 
+               *parse_ptr != '(' && *parse_ptr != ')') {
+            if (i < 63) token[i++] = *parse_ptr;
+            parse_ptr++;
+        }
+        
+        /* Attempt to parse the string as a pure mathematical constant */
+        val = strtod(token, &endptr);
+        
+        if (*endptr == '\0' && strlen(token) > 0) {
+            /* It's a pure number (e.g., "0.5") */
+            n = make_node(AST_CONST);
+            n->value = (float)val;
+        } else {
+            /* It contains letters (e.g., "i.bmp" or "shadow"). It is a Layer Name! */
+            n = make_node(AST_LAYER);
+            /* This will store -1 if the layer isn't found, which safely fails validation later */
+            n->value = (float)get_layer_idx_by_name(token); 
+        }
     }
     return n;
 }

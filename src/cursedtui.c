@@ -12,7 +12,7 @@ void draw_ui() {
     int i;
     clear_screen();
     
-    printf("\033[1;37;44m CURSED IMG EDTR v0.1 | LAYERS: ");
+    printf("\033[1;37;44m CURSED IMG EDTR | CANVAS: %dx%d | LAYERS: ", canvas_width, canvas_height);
     for (i = 0; i < MAX_LAYERS; i++) {
         if (layers[i].is_active) {
             if (i == selected_layer_idx) {
