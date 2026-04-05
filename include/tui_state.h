@@ -26,9 +26,11 @@ extern int log_count;
 extern tcursed_pix current_color;
 extern void (*cursed_log_callback)(const char* msg);
 
+extern int canvas_width;
+extern int canvas_height;
 /* Core helpers */
 void clear_screen();
 void add_log(const char* message);
 tcursed_pix make_pixel(uint16_t r, uint16_t g, uint16_t b, uint16_t a);
-
+int get_layer_idx_by_name(const char* name);
 #endif
