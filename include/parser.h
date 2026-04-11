@@ -14,11 +14,13 @@ typedef enum {
     CMD_CLEAR,
     CMD_BLUR,
     CMD_INVERT,
+    CMD_FILTER,
     CMD_NEW,
-    CMD_RECT,
+    CMD_DRAW,
     CMD_SAVE,
     CMD_EVAL,
-    CMD_COLOR
+    CMD_COLOR,
+    CMD_HELP
 } CommandType;
 
 typedef struct {

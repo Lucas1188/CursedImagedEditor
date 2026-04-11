@@ -10,7 +10,7 @@ static const char* parse_ptr;
 static ASTNode* make_node(ASTNodeType type) {
     if (ast_node_count >= 256) return NULL;
     ASTNode* n = &ast_pool[ast_node_count++];
-    n->type = type; n->left = n->right = NULL; n->value = 0;
+    n->type = type; n->left = n->right = NULL; n->value = 0; n->channel_mask = 15;
     return n;
 }
 
@@ -32,13 +32,12 @@ static ASTNode* parse_ast_factor() {
         ASTNode* zero = make_node(AST_CONST); zero->value = 0.0f;
         n->left = zero; n->right = parse_ast_factor();
     } else {
-        /* --- NEW LEXER LOGIC --- */
         char token[64] = {0};
         int i = 0;
-        char* endptr;
+        int mask = 15; /* Default to 15 (1|2|4|8), meaning all channels active */
+        char *endptr, *bracket, *c;
         double val;
         
-        /* Read the string until we hit a space or mathematical operator */
         while (*parse_ptr && *parse_ptr != ' ' && *parse_ptr != '\t' && 
                *parse_ptr != '+' && *parse_ptr != '-' && 
                *parse_ptr != '*' && *parse_ptr != '/' && 
@@ -47,18 +46,31 @@ static ASTNode* parse_ast_factor() {
             parse_ptr++;
         }
         
-        /* Attempt to parse the string as a pure mathematical constant */
+        /* --- NEW: CHANNEL MASK DETECTION --- */
+        bracket = strchr(token, '[');
+        if (bracket) {
+            *bracket = '\0'; /* Cut the string here so 'token' becomes just the layer name */
+            mask = 0;        /* Reset mask, we will build it from the brackets */
+            c = bracket + 1;
+            while (*c && *c != ']') {
+                if (*c == 'r' || *c == 'R') mask |= 1;
+                else if (*c == 'g' || *c == 'G') mask |= 2;
+                else if (*c == 'b' || *c == 'B') mask |= 4;
+                else if (*c == 'a' || *c == 'A') mask |= 8;
+                c++;
+            }
+            if (mask == 0) mask = 15; /* Safe fallback */
+        }
+        
         val = strtod(token, &endptr);
         
         if (*endptr == '\0' && strlen(token) > 0) {
-            /* It's a pure number (e.g., "0.5") */
             n = make_node(AST_CONST);
             n->value = (float)val;
         } else {
-            /* It contains letters (e.g., "i.bmp" or "shadow"). It is a Layer Name! */
             n = make_node(AST_LAYER);
-            /* This will store -1 if the layer isn't found, which safely fails validation later */
             n->value = (float)get_layer_idx_by_name(token); 
+            n->channel_mask = mask; /* Attach the mask to the node! */
         }
     }
     return n;
@@ -114,29 +126,44 @@ int check_ast_layers(ASTNode* node, int* w, int* h) {
 }
 
 RGBFloat eval_ast(ASTNode* node, size_t p_idx) {
-    RGBFloat res = {0,0,0};
+    RGBFloat res = {0.0f, 0.0f, 0.0f, 0.0f};
+    
     if (!node) return res;
+
     if (node->type == AST_CONST) {
-        res.r = res.g = res.b = node->value; return res;
-    }
-    if (node->type == AST_LAYER) {
-        int l_id = (int)node->value;
-        uint16_t* ch = (uint16_t*)&(layers[l_id].img_data->pxs[p_idx]);
-        res.r = ch[0]; res.g = ch[1]; res.b = ch[2];
+        /* Broadcast scalar to all channels */
+        res.r = res.g = res.b = res.a = node->value;
         return res;
     }
-    
+
+    if (node->type == AST_LAYER) {
+        int l_id = (int)node->value;
+        uint64_t px = layers[l_id].img_data->pxs[p_idx];
+        
+        /* Apply mask: If the bit is missing, the channel stays 0.0f */
+        if (node->channel_mask & 1) res.r = (float)UNPACK_R(px);
+        if (node->channel_mask & 2) res.g = (float)UNPACK_G(px);
+        if (node->channel_mask & 4) res.b = (float)UNPACK_B(px);
+        if (node->channel_mask & 8) res.a = (float)UNPACK_A(px);
+        
+        return res;
+    }
+
     RGBFloat L = eval_ast(node->left, p_idx);
     RGBFloat R = eval_ast(node->right, p_idx);
-    
+
     switch (node->type) {
-        case AST_OP_ADD: res.r=L.r+R.r; res.g=L.g+R.g; res.b=L.b+R.b; break;
-        case AST_OP_SUB: res.r=L.r-R.r; res.g=L.g-R.g; res.b=L.b-R.b; break;
-        case AST_OP_MUL: res.r=L.r*R.r; res.g=L.g*R.g; res.b=L.b*R.b; break;
-        case AST_OP_DIV:
-            res.r = (R.r == 0) ? 65535 : L.r / R.r;
-            res.g = (R.g == 0) ? 65535 : L.g / R.g;
-            res.b = (R.b == 0) ? 65535 : L.b / R.b;
+        case AST_OP_ADD: 
+            res.r = L.r + R.r; res.g = L.g + R.g; res.b = L.b + R.b; res.a = L.a + R.a; break;
+        case AST_OP_SUB: 
+            res.r = L.r - R.r; res.g = L.g - R.g; res.b = L.b - R.b; res.a = L.a - R.a; break;
+        case AST_OP_MUL: 
+            res.r = L.r * R.r; res.g = L.g * R.g; res.b = L.b * R.b; res.a = L.a * R.a; break;
+        case AST_OP_DIV: 
+            res.r = (R.r != 0) ? L.r / R.r : 0; 
+            res.g = (R.g != 0) ? L.g / R.g : 0; 
+            res.b = (R.b != 0) ? L.b / R.b : 0; 
+            res.a = (R.a != 0) ? L.a / R.a : 0; 
             break;
     }
     return res;

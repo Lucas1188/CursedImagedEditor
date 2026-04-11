@@ -11,6 +11,16 @@
 #define CLAMP(x, low, high)    (((x) > (high)) ? (high) : (((x) < (low)) ? (low) : (x)))
 #define CLAMP16(x, low, high)  (((x) > (high)) ? (high) : (((x) < (low)) ? (low) : (x)))
 
+/* Unpack a 64-bit pixel into individual 16-bit channels */
+#define UNPACK_R(px) (((uint64_t)(px) >> 48) & 0xFFFF)
+#define UNPACK_G(px) (((uint64_t)(px) >> 32) & 0xFFFF)
+#define UNPACK_B(px) (((uint64_t)(px) >> 16) & 0xFFFF)
+#define UNPACK_A(px) ((uint64_t)(px) & 0xFFFF)
+
+/* Pack four 16-bit channels back into a single 64-bit uint64_t */
+#define PACK_RGBA64(r, g, b, a) \
+    (((uint64_t)(r) << 48) | ((uint64_t)(g) << 32) | ((uint64_t)(b) << 16) | (uint64_t)(a))
+
 typedef struct {
     char name[64];
     int is_active;

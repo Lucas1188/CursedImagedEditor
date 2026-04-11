@@ -172,3 +172,129 @@ void cursed_apply_kernel(cursed_img* img, const cursed_kernel* k)
 
     free(buf);
 }
+/* Custom exponential function (Taylor Series) to avoid math.h */
+static double cursed_exp(double x) {
+    double sum = 1.0;
+    double term = 1.0;
+    int is_negative = 0;
+    int i;
+
+    /* Handle negative exponents safely by calculating the positive and dividing */
+    if (x < 0.0) {
+        is_negative = 1;
+        x = -x;
+    }
+
+    /* 25 iterations is more than enough precision for a Gaussian visual curve */
+    for (i = 1; i < 25; i++) {
+        term *= (x / (double)i);
+        sum += term;
+        
+        /* Early exit if the numbers get too microscopic to matter */
+        if (term < 0.0000001) break; 
+    }
+
+    if (is_negative) {
+        return 1.0 / sum;
+    }
+    return sum;
+}
+/* * Applies a true two-pass separable Gaussian blur.
+ * radius: The distance the blur spreads (e.g., radius 50 = 101x101 effective kernel)
+ * sigma: The "softness" of the blur. If 0, it auto-calculates a good default.
+ */
+void cursed_apply_separable_blur(cursed_img* img, int radius, double sigma) {
+    int size = radius * 2 + 1;
+    double* kernel;
+    double sum = 0.0;
+    int i, x, y, kx, ky, sx, sy, ci;
+    size_t w, h;
+    double *buf_in, *buf_out;
+    const char channels[3] = {'R', 'G', 'B'};
+    cursedimg_channel ch;
+
+    if (!img || !img->pxs || radius < 1) return;
+
+    /* Auto-calculate standard deviation if none provided */
+    if (sigma <= 0.0) sigma = (double)radius / 3.0;
+
+    w = img->width;
+    h = img->height;
+
+    kernel = (double*)malloc(size * sizeof(double));
+    buf_in = (double*)malloc(w * h * sizeof(double));
+    buf_out = (double*)malloc(w * h * sizeof(double));
+
+    /* Safe allocation check */
+    if (!kernel || !buf_in || !buf_out) {
+        if (kernel) free(kernel);
+        if (buf_in) free(buf_in);
+        if (buf_out) free(buf_out);
+        return;
+    }
+
+    /* --- 1. GENERATE THE 1D GAUSSIAN KERNEL --- */
+    for (i = -radius; i <= radius; i++) {
+        /* Call our custom math function! */
+        double val = cursed_exp(-((double)(i * i)) / (2.0 * sigma * sigma));
+        kernel[i + radius] = val;
+        sum += val;
+    }
+    
+    /* Normalize the kernel so the image doesn't get brighter or darker */
+    for (i = 0; i < size; i++) {
+        kernel[i] /= sum;
+    }
+
+    /* --- 2. APPLY THE TWO-PASS BLUR --- */
+    for (ci = 0; ci < 3; ci++) {
+        ch = channel_of(img, channels[ci]);
+
+        /* Snapshot the channel into buf_in */
+        for (y = 0; y < (int)h; y++) {
+            for (x = 0; x < (int)w; x++) {
+                buf_in[y * w + x] = (double)channel_get(&ch, x, y);
+            }
+        }
+
+        /* PASS A: Horizontal Blur (Read buf_in, write to buf_out) */
+        for (y = 0; y < (int)h; y++) {
+            for (x = 0; x < (int)w; x++) {
+                double acc = 0.0;
+                for (kx = -radius; kx <= radius; kx++) {
+                    sx = x + kx;
+                    /* Clamp edges */
+                    if (sx < 0) sx = 0;
+                    if (sx >= (int)w) sx = (int)w - 1;
+                    
+                    acc += buf_in[y * w + sx] * kernel[kx + radius];
+                }
+                buf_out[y * w + x] = acc;
+            }
+        }
+
+        /* PASS B: Vertical Blur (Read buf_out, write to image) */
+        for (y = 0; y < (int)h; y++) {
+            for (x = 0; x < (int)w; x++) {
+                double acc = 0.0;
+                for (ky = -radius; ky <= radius; ky++) {
+                    sy = y + ky;
+                    /* Clamp edges */
+                    if (sy < 0) sy = 0;
+                    if (sy >= (int)h) sy = (int)h - 1;
+                    
+                    acc += buf_out[sy * w + x] * kernel[ky + radius];
+                }
+
+                /* Clamp to 16-bit space and write back */
+                if (acc < 0.0) acc = 0.0;
+                if (acc > 65535.0) acc = 65535.0;
+                channel_set(&ch, x, y, (uint64_t)acc);
+            }
+        }
+    }
+
+    free(kernel);
+    free(buf_in);
+    free(buf_out);
+}

@@ -4,13 +4,14 @@
 #include <stddef.h>
 #include "tui_state.h"
 
-typedef struct { float r, g, b; } RGBFloat;
+typedef struct { float r, g, b, a;} RGBFloat;
 
 typedef enum { AST_OP_ADD, AST_OP_SUB, AST_OP_MUL, AST_OP_DIV, AST_LAYER, AST_CONST } ASTNodeType;
 
 typedef struct ASTNode {
     ASTNodeType type;
     float value;
+    int channel_mask;
     struct ASTNode* left;
     struct ASTNode* right;
 } ASTNode;

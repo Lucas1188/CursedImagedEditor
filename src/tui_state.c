@@ -32,12 +32,8 @@ void add_log(const char* message) {
 }
 
 tcursed_pix make_pixel(uint16_t r, uint16_t g, uint16_t b, uint16_t a) {
-    uint64_t px = 0;
-    px |= ((uint64_t)r);
-    px |= ((uint64_t)g << 16);
-    px |= ((uint64_t)b << 32);
-    px |= ((uint64_t)a << 48);
-    return (tcursed_pix)px;
+    /* Rely on the macro to guarantee R-G-B-A order in memory */
+    return (tcursed_pix)PACK_RGBA64(r, g, b, a);
 }
 
 int get_layer_idx_by_name(const char* name) {

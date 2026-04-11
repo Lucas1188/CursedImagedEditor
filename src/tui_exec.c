@@ -11,10 +11,30 @@
 #include "../lib/bitmap/bitmap.h"
 #include "../lib/bitmap/bitmap_cursed.h"
 #include "../lib/png/png.h"
+#include "../lib/cursedlib/math/kernels.h"
 
 #define MAX_FILES 50
 static char file_cache[MAX_FILES][256] = {0};
 static int file_cache_count = 0;
+
+/* Helper to extract a clean name (e.g., "./img/sprite.bmp" -> "sprite") */
+static void extract_base_name(const char* filepath, char* out_name, size_t max_len) {
+    const char* slash = strrchr(filepath, '/');
+    const char* backslash = strrchr(filepath, '\\');
+    const char* base = filepath;
+    char* dot;
+
+    /* Find the last folder separator */
+    if (slash) base = slash + 1;
+    if (backslash && backslash + 1 > base) base = backslash + 1;
+    
+    strncpy(out_name, base, max_len);
+    out_name[max_len - 1] = '\0';
+    
+    /* Strip the file extension */
+    dot = strrchr(out_name, '.');
+    if (dot) *dot = '\0';
+}
 
 static void print_directory_list() {
     DIR *d;
@@ -106,7 +126,12 @@ int execute_command(CommandAST ast) {
         case CMD_LIST:
             print_directory_list();
             break;
-
+        case CMD_HELP:
+            {
+                const char* target = get_arg_str(&ast, 0, "");
+                display_help(target);
+            }
+            break;
         case CMD_LOAD:
             {
                 char target_file[256] = {0};
@@ -152,7 +177,7 @@ int execute_command(CommandAST ast) {
                     return 1;
                 }
 
-                /* --- NEW: CENTERING & FITTING LOGIC --- */
+                
                 if (canvas_width == 0 && canvas_height == 0) {
                     /* First image loaded sets the master canvas size */
                     canvas_width = loaded_img->width;
@@ -177,9 +202,14 @@ int execute_command(CommandAST ast) {
                     add_log(msg_buffer);
                 }
 
+                /* Inside CMD_LOAD layer assignment loop: */
                 for (i = 0; i < MAX_LAYERS; i++) {
                     if (!layers[i].is_active) {
-                        strncpy(layers[i].name, target_file, 63); 
+                        /* Extract a clean, math-friendly name */
+                        char clean_name[64];
+                        extract_base_name(target_file, clean_name, sizeof(clean_name));
+                        
+                        strncpy(layers[i].name, clean_name, 63); 
                         layers[i].is_active = 1;
                         layers[i].op_count = 0;
                         layers[i].img_data = loaded_img; 
@@ -212,7 +242,6 @@ int execute_command(CommandAST ast) {
             add_log("Error: Layer not found.");
             break;
             
-        case CMD_BLUR:
         case CMD_INVERT:
             {
                 if (selected_layer_idx == -1) { add_log("Error: No layer selected."); return 1; }
@@ -241,31 +270,38 @@ int execute_command(CommandAST ast) {
         case CMD_NEW:
             {
                 int w = 512, h = 512;
-                const char* custom_name = "Blank";
+                char custom_name[64] = "Blank";
 
-                /* --- SMART CANVAS ARGUMENT PARSING --- */
+                /* Explicit argument counting for intuitive behavior */
+                if (ast.num_args == 1) {
+                    /* e.g., 'new shadow' */
+                    if (canvas_width > 0 && canvas_height > 0) {
+                        w = canvas_width; h = canvas_height;
+                        strncpy(custom_name, get_arg_str(&ast, 0, "Blank"), 63);
+                    } else {
+                        add_log("Error: Canvas is empty. 'new' requires width and height (e.g., 'new 800 600').");
+                        return 1;
+                    }
+                } else if (ast.num_args == 2) {
+                    /* e.g., 'new 800 600' (Leaves name as "Blank") */
+                    w = get_arg_int(&ast, 0, 512);
+                    h = get_arg_int(&ast, 1, 512);
+                } else if (ast.num_args >= 3) {
+                    /* e.g., 'new 800 600 shadow' */
+                    w = get_arg_int(&ast, 0, 512);
+                    h = get_arg_int(&ast, 1, 512);
+                    strncpy(custom_name, get_arg_str(&ast, 2, "Blank"), 63);
+                }
+
+                /* Canvas locking enforcement */
                 if (canvas_width > 0 && canvas_height > 0) {
-                    /* Canvas is LOCKED. Width/Height are ignored. */
-                    w = canvas_width;
-                    h = canvas_height;
-                    
-                    /* If they only provided 1 argument (e.g., 'new shadow'), treat it as the name */
-                    if (ast.num_args == 1) {
-                        custom_name = get_arg_str(&ast, 0, "Blank");
-                    } 
-                    /* If they still typed 'new 800 600 shadow', extract the 3rd arg */
-                    else if (ast.num_args >= 3) {
-                        custom_name = get_arg_str(&ast, 2, "Blank");
+                    if (w != canvas_width || h != canvas_height) {
                         snprintf(msg_buffer, sizeof(msg_buffer), "Notice: Enforcing canvas size (%dx%d).", canvas_width, canvas_height);
                         add_log(msg_buffer);
                     }
+                    w = canvas_width;
+                    h = canvas_height;
                 } else {
-                    /* Canvas is EMPTY. We need Width and Height. */
-                    w = get_arg_int(&ast, 0, 512);
-                    h = get_arg_int(&ast, 1, 512);
-                    custom_name = get_arg_str(&ast, 2, "Blank");
-                    
-                    /* Lock the canvas for future layers */
                     canvas_width = w;
                     canvas_height = h;
                 }
@@ -274,7 +310,7 @@ int execute_command(CommandAST ast) {
                     add_log("Error: Dimensions must be between 1 and 8192."); 
                     return 1;
                 }
-                
+                                
                 int layer_slot = -1;
                 for (i = 0; i < MAX_LAYERS; i++) {
                     if (!layers[i].is_active) { layer_slot = i; break; }
@@ -325,25 +361,70 @@ int execute_command(CommandAST ast) {
             }
             break;
 
-        case CMD_RECT:
+        case CMD_DRAW:
             {
-                if (selected_layer_idx == -1) { add_log("Error: Select a layer first."); return 1; }
-                if (layers[selected_layer_idx].img_data->pxs == NULL) { add_log("Error: Pixel buffer is NULL!"); return 1; }
+                const char* shape;
+                cursed_img* target;
 
-                int x0 = get_arg_int(&ast, 0, 0); int y0 = get_arg_int(&ast, 1, 0);
-                int x1 = get_arg_int(&ast, 2, 100); int y1 = get_arg_int(&ast, 3, 100);
-                
-                if (x0 > x1) { int tmp = x0; x0 = x1; x1 = tmp; }
-                if (y0 > y1) { int tmp = y0; y0 = y1; y1 = tmp; }
+                if (selected_layer_idx == -1 || layers[selected_layer_idx].img_data == NULL) { 
+                    add_log("Error: No active layer selected."); return 1; 
+                }
+                if (ast.num_args < 1) { 
+                    add_log("Error: 'draw' requires a shape (e.g., 'draw circle ...')."); return 1; 
+                }
 
-                size_t max_w = layers[selected_layer_idx].img_data->width - 1;
-                size_t max_h = layers[selected_layer_idx].img_data->height - 1;
+                shape = get_arg_str(&ast, 0, "");
+                target = layers[selected_layer_idx].img_data;
+
+                if (strcmp(shape, "line") == 0) {
+                    if (ast.num_args < 5) { add_log("Usage: draw line <x0> <y0> <x1> <y1>"); return 1; }
+                    draw_line(get_arg_int(&ast, 1, 0), get_arg_int(&ast, 2, 0),
+                              get_arg_int(&ast, 3, 0), get_arg_int(&ast, 4, 0), current_color, target);
+                    add_log("-> Drew line.");
+                } 
+                else if (strcmp(shape, "rect") == 0 || strcmp(shape, "fillrect") == 0) {
+                    if (ast.num_args < 5) { add_log("Usage: draw rect/fillrect <x0> <y0> <x1> <y1>"); return 1; }
+                    if (strcmp(shape, "fillrect") == 0) {
+                        fill_rectangle(get_arg_int(&ast, 1, 0), get_arg_int(&ast, 2, 0), 
+                                       get_arg_int(&ast, 3, 0), get_arg_int(&ast, 4, 0), current_color, target);
+                        add_log("-> Drew filled rectangle.");
+                    } else {
+                        draw_rectangle(get_arg_int(&ast, 1, 0), get_arg_int(&ast, 2, 0), 
+                                       get_arg_int(&ast, 3, 0), get_arg_int(&ast, 4, 0), current_color, target);
+                        add_log("-> Drew rectangle outline.");
+                    }
+                } 
+                else if (strcmp(shape, "circle") == 0 || strcmp(shape, "fillcircle") == 0) {
+                    if (ast.num_args < 4) { add_log("Usage: draw circle/fillcircle <cx> <cy> <r>"); return 1; }
+                    if (strcmp(shape, "fillcircle") == 0) {
+                        fill_circle(get_arg_int(&ast, 1, 0), get_arg_int(&ast, 2, 0), 
+                                    get_arg_int(&ast, 3, 0), current_color, target);
+                        add_log("-> Drew filled circle.");
+                    } else {
+                        draw_circle(get_arg_int(&ast, 1, 0), get_arg_int(&ast, 2, 0), 
+                                    get_arg_int(&ast, 3, 0), current_color, target);
+                        add_log("-> Drew circle outline.");
+                    }
+                } 
+                else if (strcmp(shape, "triangle") == 0 || strcmp(shape, "filltriangle") == 0) {
+                    if (ast.num_args < 7) { add_log("Usage: draw triangle/filltriangle <x0> y0 x1 y1 x2 y2>"); return 1; }
+                    if (strcmp(shape, "filltriangle") == 0) {
+                        fill_triangle(get_arg_int(&ast, 1, 0), get_arg_int(&ast, 2, 0), get_arg_int(&ast, 3, 0), 
+                                      get_arg_int(&ast, 4, 0), get_arg_int(&ast, 5, 0), get_arg_int(&ast, 6, 0), current_color, target);
+                        add_log("-> Drew filled triangle.");
+                    } else {
+                        draw_triangle(get_arg_int(&ast, 1, 0), get_arg_int(&ast, 2, 0), get_arg_int(&ast, 3, 0), 
+                                      get_arg_int(&ast, 4, 0), get_arg_int(&ast, 5, 0), get_arg_int(&ast, 6, 0), current_color, target);
+                        add_log("-> Drew triangle outline.");
+                    }
+                } 
+                else {
+                    add_log("Error: Unknown shape. Try: line, rect, circle, triangle");
+                    add_log("       (add 'fill' prefix for solid shapes, e.g., 'fillcircle').");
+                    return 1;
+                }
                 
-                if (x1 > max_w) x1 = max_w;
-                if (y1 > max_h) y1 = max_h;
-                
-                draw_rectangle(x0, y0, x1, y1, current_color, layers[selected_layer_idx].img_data);
-                add_log("-> Drew rectangle.");
+                layers[selected_layer_idx].op_count++;
             }
             break;
 
@@ -355,37 +436,88 @@ int execute_command(CommandAST ast) {
 
                 char format[16] = "png"; 
                 char filename[256] = {0};
+                const char* active_name = layers[selected_layer_idx].name;
+                cursed_img* active_img = layers[selected_layer_idx].img_data;
 
+                /* 1. Argument Parsing */
                 if (ast.num_args == 0) {
-                    int name_idx = layers[0].is_active ? 0 : selected_layer_idx;
-                    snprintf(filename, sizeof(filename), "%s.png", layers[name_idx].name);
+                    snprintf(filename, sizeof(filename), "%s.png", active_name);
                 } else if (ast.num_args == 1) {
-                    strncpy(filename, get_arg_str(&ast, 0, "output.png"), 255);
+                    const char* arg = get_arg_str(&ast, 0, "");
+                    if (strcmp(arg, "png") == 0 || strcmp(arg, "bmp") == 0) {
+                        strncpy(format, arg, 15);
+                        snprintf(filename, sizeof(filename), "%s.%s", active_name, format);
+                    } else {
+                        strncpy(filename, arg, 255);
+                        const char* dot = strrchr(filename, '.');
+                        if (dot && strcmp(dot, ".bmp") == 0) {
+                            strcpy(format, "bmp");
+                        }
+                    }
                 } else {
                     strncpy(format, get_arg_str(&ast, 0, "png"), 15);
                     strncpy(filename, get_arg_str(&ast, 1, "output.png"), 255);
                 }
 
-                bitmap* out_bmp = cursed_to_bitmap(layers[selected_layer_idx].img_data);
-                if (!out_bmp) { add_log("Error: Conversion failed."); return 1; }
-
+                /* 2. Route to correct format logic */
                 if (strcmp(format, "bmp") == 0) {
+                    /* --- BMP EXPORT (8-bit) --- */
+                    /* ONLY call cursed_to_bitmap if we are saving a BMP! */
+                    bitmap* out_bmp = cursed_to_bitmap(active_img);
+                    if (!out_bmp) { add_log("Error: Conversion to BMP failed."); return 1; }
+                                        
                     if (write_bitmap(out_bmp, filename)) {
-                        snprintf(msg_buffer, sizeof(msg_buffer), "-> Saved layer as BMP to '%s'", filename);
+                        snprintf(msg_buffer, sizeof(msg_buffer), "-> Saved layer as 8-bit BMP to '%s'", filename);
                         add_log(msg_buffer);
-                    } else add_log("Error: Failed to write BMP file.");
-                } else { 
-                    ihdr_chunk ihdr = IHDR_TRUECOLOR8_A8(out_bmp->width, out_bmp->height);
-                    png_s* png = create_png(&ihdr, out_bmp->pixels, 4); 
+                    } else {
+                        add_log("Error: Failed to write BMP file.");
+                    }
+                    free_bitmap(out_bmp);
+                    
+               } else { 
+                    /* --- PNG EXPORT (16-bit Truecolor) --- */
+                    
+                    size_t total_px = active_img->width * active_img->height;
+                    size_t buf_size = total_px * 8; /* 4 channels * 2 bytes = 8 bytes per pixel */
+                    size_t p;
+                    /* Create a strict, PNG-compliant Big-Endian RGBA buffer */
+                    unsigned char* png_buffer = (unsigned char*)malloc(buf_size);
+                    if (!png_buffer) {
+                        add_log("Error: Failed to allocate PNG export buffer.");
+                        return 1;
+                    }
+                    
+                    for (p = 0; p < total_px; p++) {
+                        uint64_t px = active_img->pxs[p];
+                        uint16_t r = UNPACK_R(px);
+                        uint16_t g = UNPACK_G(px);
+                        uint16_t b = UNPACK_B(px);
+                        uint16_t a = UNPACK_A(px);
+                        
+                        /* PNG strictly requires Big-Endian (High byte, then Low byte) */
+                        png_buffer[p*8 + 0] = (r >> 8) & 0xFF;
+                        png_buffer[p*8 + 1] = r & 0xFF;
+                        png_buffer[p*8 + 2] = (g >> 8) & 0xFF;
+                        png_buffer[p*8 + 3] = g & 0xFF;
+                        png_buffer[p*8 + 4] = (b >> 8) & 0xFF;
+                        png_buffer[p*8 + 5] = b & 0xFF;
+                        png_buffer[p*8 + 6] = (a >> 8) & 0xFF;
+                        png_buffer[p*8 + 7] = a & 0xFF;
+                    }
+                    
+                    ihdr_chunk ihdr = IHDR_TRUECOLOR16_A16(active_img->width, active_img->height);
+                    png_s* png = create_png(&ihdr, png_buffer, 8); 
+                    
                     if (png) {
                         if (write_png(filename, png) == 0) {
-                            snprintf(msg_buffer, sizeof(msg_buffer), "-> Saved layer as PNG to '%s'", filename);
+                            snprintf(msg_buffer, sizeof(msg_buffer), "-> Saved 16-bit layer as PNG to '%s'", filename);
                             add_log(msg_buffer);
                         } else add_log("Error: Failed to write PNG file.");
                         free_png(png);
                     } else add_log("Error: Failed to encode PNG structure.");
+                    
+                    free(png_buffer); /* Clean up the temporary export buffer */
                 }
-                free_bitmap(out_bmp);
             }
             break;
 
@@ -452,23 +584,83 @@ int execute_command(CommandAST ast) {
                 }
                 layers[dest_id].op_count++;
 
-                /* 5. Fire AST across all pixels... */
-
+                /* 5. Fire AST across all pixels */
                 size_t total_pixels = canvas_width * canvas_height;
-                for (p_idx = 0; p_idx < total_pixels; p_idx++) {
-                    RGBFloat final_color = eval_ast(root, p_idx);
-                    uint16_t* dest_channels = (uint16_t*)&(dest_img->pxs[p_idx]);
-                    dest_channels[0] = CLAMP16((int)final_color.r, 0, 65535);
-                    dest_channels[1] = CLAMP16((int)final_color.g, 0, 65535);
-                    dest_channels[2] = CLAMP16((int)final_color.b, 0, 65535);
-                    dest_channels[3] = 65535; 
+                size_t pp_idx;
+                
+                for (pp_idx = 0; pp_idx < total_pixels; pp_idx++) {
+                    /* Evaluate the complete math tree for this specific pixel */
+                    RGBFloat final_color = eval_ast(root, pp_idx);
+                    
+                    uint16_t r = CLAMP16((int)final_color.r, 0, 65535);
+                    uint16_t g = CLAMP16((int)final_color.g, 0, 65535);
+                    uint16_t b = CLAMP16((int)final_color.b, 0, 65535);
+                    uint16_t a = CLAMP16((int)final_color.a, 0, 65535);
+                    dest_img->pxs[pp_idx] = PACK_RGBA64(r, g, b, a);
                 }
-
                 selected_layer_idx = dest_id;
                 add_log("-> Expression successfully evaluated.");
             }
             break;
-            
+        case CMD_FILTER:
+            {
+                const char* filter_name;
+                
+                if (selected_layer_idx == -1 || layers[selected_layer_idx].img_data == NULL) { 
+                    add_log("Error: No active layer selected."); return 1; 
+                }
+                if (ast.num_args < 1) { 
+                    add_log("Error: 'filter' requires a name (e.g., 'filter edge1' or 'filter blur 50')."); 
+                    return 1; 
+                }
+
+                filter_name = get_arg_str(&ast, 0, "");
+
+                /* --- ROUTE 1: Dynamic Separable Filters --- */
+                if (strcmp(filter_name, "blur") == 0) {
+                    int radius = get_arg_int(&ast, 1, 5);
+                    double sigma = (double)get_arg_int(&ast, 2, 0);
+
+                    if (radius > 1000) {
+                        add_log("Notice: Clamping massive blur radius to 1000 to save CPU.");
+                        radius = 1000;
+                    }
+                    
+                    cursed_apply_separable_blur(layers[selected_layer_idx].img_data, radius, sigma);
+                    
+                    snprintf(msg_buffer, sizeof(msg_buffer), "-> Applied separable blur (Radius: %d)", radius);
+                    add_log(msg_buffer);
+                } 
+                /* --- ROUTE 2: Hardcoded 3x3 and 5x5 Kernels --- */
+                else {
+                    const cursed_kernel* k = NULL;
+
+                    if (strcmp(filter_name, "identity") == 0) k = &CURSED_KERNEL_IDENTITY;
+                    else if (strcmp(filter_name, "edge1") == 0) k = &CURSED_KERNEL_EDGE1;
+                    else if (strcmp(filter_name, "edge2") == 0) k = &CURSED_KERNEL_EDGE2;
+                    else if (strcmp(filter_name, "sharpen") == 0) k = &CURSED_KERNEL_SHARPEN;
+                    else if (strcmp(filter_name, "box_blur") == 0) k = &CURSED_KERNEL_BOX_BLUR;
+                    else if (strcmp(filter_name, "gaussian3") == 0) k = &CURSED_KERNEL_GAUSSIAN3;
+                    else if (strcmp(filter_name, "gaussian5") == 0) k = &CURSED_KERNEL_GAUSSIAN5;
+                    else if (strcmp(filter_name, "unsharp5") == 0) k = &CURSED_KERNEL_UNSHARP5;
+                    else if (strcmp(filter_name, "emboss") == 0) k = &CURSED_KERNEL_EMBOSS;
+                    else if (strcmp(filter_name, "sobel_x") == 0) k = &CURSED_KERNEL_SOBEL_GX;
+                    else if (strcmp(filter_name, "sobel_y") == 0) k = &CURSED_KERNEL_SOBEL_GY;
+
+                    if (k) {
+                        cursed_apply_kernel(layers[selected_layer_idx].img_data, k);
+                        snprintf(msg_buffer, sizeof(msg_buffer), "-> Applied 2D kernel '%s'", filter_name);
+                        add_log(msg_buffer);
+                    } else {
+                        add_log("Error: Unknown filter.");
+                        add_log("       Try: blur <rad>, edge1, sharpen, emboss, sobel_x, etc.");
+                        return 1;
+                    }
+                }
+                
+                layers[selected_layer_idx].op_count++;
+            }
+            break;
         case CMD_UNKNOWN:
         default:
             add_log("Error: Unknown internal command.");

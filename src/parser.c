@@ -47,8 +47,10 @@ CommandAST parse_command(const char* input) {
     else if (strcmp(cmd_str, "invert") == 0) ast.type = CMD_INVERT;
     else if (strcmp(cmd_str, "new") == 0) ast.type = CMD_NEW;
     else if (strcmp(cmd_str, "save") == 0) ast.type = CMD_SAVE;
-    else if (strcmp(cmd_str, "rect") == 0) ast.type = CMD_RECT;
+    else if (strcmp(cmd_str, "draw") == 0) ast.type = CMD_DRAW; 
     else if (strcmp(cmd_str, "color") == 0) ast.type = CMD_COLOR;
+    else if (strcmp(cmd_str, "filter") == 0) ast.type = CMD_FILTER;
+    else if (strcmp(cmd_str, "help") == 0) ast.type = CMD_HELP;
 
     return ast;
 }
