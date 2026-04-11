@@ -20,7 +20,9 @@ typedef enum {
     CMD_SAVE,
     CMD_EVAL,
     CMD_COLOR,
-    CMD_HELP
+    CMD_HELP,
+    CMD_MONITOR,
+    CMD_LOG,
 } CommandType;
 
 typedef struct {

@@ -51,6 +51,8 @@ CommandAST parse_command(const char* input) {
     else if (strcmp(cmd_str, "color") == 0) ast.type = CMD_COLOR;
     else if (strcmp(cmd_str, "filter") == 0) ast.type = CMD_FILTER;
     else if (strcmp(cmd_str, "help") == 0) ast.type = CMD_HELP;
+    else if (strcmp(cmd_str, "monitor") == 0) ast.type = CMD_MONITOR;
+    else if (strcmp(cmd_str, "log") == 0) ast.type = CMD_LOG;
 
     return ast;
 }

@@ -8,6 +8,7 @@
 #include "../include/tui_state.h"
 #include "../include/tui_math.h"
 #include "../include/parser.h"
+#include "../include/cursed_viewer.h"
 #include "../lib/bitmap/bitmap.h"
 #include "../lib/bitmap/bitmap_cursed.h"
 #include "../lib/png/png.h"
@@ -113,6 +114,7 @@ static cursed_img* fit_to_canvas(cursed_img* src, int target_w, int target_h) {
     
     return dest;
 }
+
 
 int execute_command(CommandAST ast) {
     char msg_buffer[128];
@@ -274,7 +276,6 @@ int execute_command(CommandAST ast) {
             } else {
                 const char* target = get_arg_str(&ast, 0, "");
                 
-                /* ROUTE 2: The Explicit Confirmation */
                 if (strcmp(target, "all") == 0) {
                     for (i = 0; i < MAX_LAYERS; i++) {
                         if (layers[i].is_active && layers[i].img_data != NULL) {
@@ -285,11 +286,14 @@ int execute_command(CommandAST ast) {
                     memset(layers, 0, sizeof(layers));
                     selected_layer_idx = -1;
                     
-                    /* ONLY reset canvas if 'all' is explicitly typed */
                     canvas_width = 0;  
                     canvas_height = 0; 
+                    
+                    /* NEW: Nuke the monitor frame so the browser goes <BLANK> */
+                    remove("temp_export.png"); 
+                    
                     add_log("-> Cleared ALL layers and reset canvas.");
-                } 
+                }
                 /* ROUTE 3: Clear specific layer by name */
                 else {
                     int target_idx = -1;
@@ -715,10 +719,68 @@ int execute_command(CommandAST ast) {
                 layers[selected_layer_idx].op_count++;
             }
             break;
+        case CMD_MONITOR:
+            generate_cursed_viewer();
+            
+            /* Save the current state immediately so the browser has something to load */
+            if (selected_layer_idx != -1 && layers[selected_layer_idx].img_data != NULL) {
+                bitmap* out_bmp = cursed_to_bitmap(layers[selected_layer_idx].img_data);
+                
+                /* You can use your PNG encoder here instead if you want smaller files! */
+                ihdr_chunk ihdr = IHDR_TRUECOLOR8_A8(out_bmp->width, out_bmp->height);
+                png_s* png = create_png(&ihdr, out_bmp->pixels, 4);
+                write_png("temp_export.png", png);
+                
+                free_png(png);
+                free_bitmap(out_bmp);
+            }
+            break;
+        case CMD_LOG:
+            {
+                FILE* f;
+                char safe_filename[256];
+                const char* user_file;
+                size_t len;
+                int i;
+
+                /* 1. Get the filename, default to "session" if they just typed "log" */
+                user_file = get_arg_str(&ast, 0, "session");
+                
+                /* Safely copy to our buffer, leaving room for ".log" */
+                strncpy(safe_filename, user_file, 250);
+                safe_filename[250] = '\0';
+                len = strlen(safe_filename);
+                
+                /* 2. Auto-append .log if it's missing */
+                if (len < 4 || strcmp(safe_filename + len - 4, ".log") != 0) {
+                    strcat(safe_filename, ".log");
+                }
+
+                /* 3. Dump the internal TUI buffer to the file */
+                f = fopen(safe_filename, "w");
+                if (f) {
+                    fprintf(f, "--- CURSED ENGINE SESSION LOG ---\n");
+                    
+                    for (i = 0; i < log_count; i++) {
+                        fprintf(f, "%s\n", window_log[i]);
+                    }
+                    
+                    fclose(f);
+                    
+                    snprintf(msg_buffer, sizeof(msg_buffer), "-> Exported command history to '%s'", safe_filename);
+                    add_log(msg_buffer);
+                } else {
+                    add_log("Error: Could not open file for logging.");
+                }
+            }
+            break;
         case CMD_UNKNOWN:
         default:
             add_log("Error: Unknown internal command.");
             break;
     }
+
+    
+
     return 1;
 }
