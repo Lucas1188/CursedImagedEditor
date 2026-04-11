@@ -115,6 +115,17 @@ static cursed_img* fit_to_canvas(cursed_img* src, int target_w, int target_h) {
     return dest;
 }
 
+/* Safely walks the AST and frees every node from the bottom up */
+void free_ast(ASTNode* node) {
+    if (node == NULL) return;
+    
+    /* Recursively free children first */
+    if (node->left != NULL) free_ast(node->left);
+    if (node->right != NULL) free_ast(node->right);
+    
+    /* Free the current node */
+    free(node);
+}
 
 int execute_command(CommandAST ast) {
     char msg_buffer[128];
@@ -124,7 +135,23 @@ int execute_command(CommandAST ast) {
         case CMD_EMPTY:
             return 1;
         case CMD_EXIT:
-            return 0;
+            {
+                int i;
+                /* Clean up all active layers before closing the app */
+                for (i = 0; i < MAX_LAYERS; i++) {
+                    if (layers[i].is_active && layers[i].img_data != NULL) {
+                        RELEASE_CURSED_IMG(*(layers[i].img_data));
+                        free(layers[i].img_data);
+                    }
+                }
+                
+                /* Nuke the temp files from the browser monitor */
+                remove("temp_export.png");
+                remove("cursed_log.js");
+                
+                add_log("-> Shutting down Cursed Engine. Goodbye!");
+            }
+            return 0; /* Or 'break' if you have a flag that handles the main loop exit */
         case CMD_LIST:
             print_directory_list();
             break;
