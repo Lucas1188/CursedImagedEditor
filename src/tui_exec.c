@@ -254,17 +254,71 @@ int execute_command(CommandAST ast) {
             break;
             
         case CMD_CLEAR:
-            for (i = 0; i < MAX_LAYERS; i++) {
-                if (layers[i].is_active && layers[i].img_data != NULL) {
-                    RELEASE_CURSED_IMG(*(layers[i].img_data));
-                    free(layers[i].img_data);
+            if (ast.num_args == 0) {
+                /* ROUTE 1: Safe Default - Clear only the active layer */
+                if (selected_layer_idx != -1 && layers[selected_layer_idx].is_active) {
+                    if (layers[selected_layer_idx].img_data != NULL) {
+                        RELEASE_CURSED_IMG(*(layers[selected_layer_idx].img_data));
+                        free(layers[selected_layer_idx].img_data);
+                    }
+                    /* Wipe the layer struct */
+                    memset(&layers[selected_layer_idx], 0, sizeof(Layer));
+                    selected_layer_idx = -1; /* Unselect it */
+                    
+                    add_log("-> Cleared active layer. (Canvas size preserved)");
+                    add_log("   (To reset the entire canvas, type 'clear all')");
+                } else {
+                    add_log("Error: No layer selected.");
+                    add_log("Usage: 'clear', 'clear <name>', or 'clear all'");
+                }
+            } else {
+                const char* target = get_arg_str(&ast, 0, "");
+                
+                /* ROUTE 2: The Explicit Confirmation */
+                if (strcmp(target, "all") == 0) {
+                    for (i = 0; i < MAX_LAYERS; i++) {
+                        if (layers[i].is_active && layers[i].img_data != NULL) {
+                            RELEASE_CURSED_IMG(*(layers[i].img_data));
+                            free(layers[i].img_data);
+                        }
+                    }
+                    memset(layers, 0, sizeof(layers));
+                    selected_layer_idx = -1;
+                    
+                    /* ONLY reset canvas if 'all' is explicitly typed */
+                    canvas_width = 0;  
+                    canvas_height = 0; 
+                    add_log("-> Cleared ALL layers and reset canvas.");
+                } 
+                /* ROUTE 3: Clear specific layer by name */
+                else {
+                    int target_idx = -1;
+                    /* Inline search for the layer name to ensure it compiles safely */
+                    for (i = 0; i < MAX_LAYERS; i++) {
+                        if (layers[i].is_active && strcmp(layers[i].name, target) == 0) {
+                            target_idx = i;
+                            break;
+                        }
+                    }
+                    
+                    if (target_idx != -1) {
+                        if (layers[target_idx].img_data != NULL) {
+                            RELEASE_CURSED_IMG(*(layers[target_idx].img_data));
+                            free(layers[target_idx].img_data);
+                        }
+                        memset(&layers[target_idx], 0, sizeof(Layer));
+                        
+                        if (selected_layer_idx == target_idx) {
+                            selected_layer_idx = -1; 
+                        }
+                        snprintf(msg_buffer, sizeof(msg_buffer), "-> Cleared layer '%s'. (Canvas size preserved)", target);
+                        add_log(msg_buffer);
+                    } else {
+                        snprintf(msg_buffer, sizeof(msg_buffer), "Error: Layer '%s' not found.", target);
+                        add_log(msg_buffer);
+                    }
                 }
             }
-            memset(layers, 0, sizeof(layers));
-            selected_layer_idx = -1;
-            canvas_width = 0;  /* <-- Reset Canvas */
-            canvas_height = 0; /* <-- Reset Canvas */
-            add_log("-> Cleared all layers and reset canvas.");
             break;
 
         case CMD_NEW:

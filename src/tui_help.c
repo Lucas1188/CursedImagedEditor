@@ -71,8 +71,10 @@ void display_help(const char* target_cmd) {
     }
     else if (strcmp(target_cmd, "clear") == 0) {
         add_log("HELP: clear");
-        add_log("Usage: clear");
-        add_log("Deletes all layers, frees memory, and unlocks Canvas size.");
+        add_log("Safely removes layers from memory.");
+        add_log("  clear         - Deletes the currently selected layer.");
+        add_log("  clear <name>  - Deletes a specific layer by name.");
+        add_log("  clear all     - Nukes all layers and resets canvas size.");
     }
     else {
         char msg[128];
