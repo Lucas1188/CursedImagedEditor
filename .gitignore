@@ -23,6 +23,9 @@ cursed
 .DS_Store
 Thumbs.db
 desktop.ini
+*.bmp
+*.png
+png
 
 # Logs and temporary files
 *.log
