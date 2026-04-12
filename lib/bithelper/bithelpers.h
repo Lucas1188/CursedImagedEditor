@@ -13,7 +13,7 @@ typedef struct bitarray{
     uint64_t bitcount;  /* bits currently in bitbuf */
 }bitarray;
 
-static int ensure_capacity(bitarray *bw, size_t extra_bytes);
+int ensure_capacity(bitarray *bw, size_t extra_bytes);
 
 size_t packbytes_aligned(bitarray *bw, const uint8_t *data, size_t n);
 

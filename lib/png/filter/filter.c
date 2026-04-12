@@ -46,8 +46,6 @@ int64_t avg_func(const uint8_t* row, uint8_t* prev_row, uint8_t* wBuffer, const 
 int64_t up_func(const uint8_t* row, uint8_t* prev_row, uint8_t* wBuffer,const size_t scanline_sz,const size_t pix_sz){
     int i;
     int64_t sum =0;
-    uint8_t* refByte;
-    uint64_t leftpad =0;
     wBuffer[0] = FILTER_UP;
     for(i=0;i<scanline_sz;i++){
         wBuffer[i+1] = row[i] - prev_row[i];
@@ -99,8 +97,7 @@ const write_filter filter_funcs[5] = {
 /*Use minimum sum heuristic*/
 
 uint8_t* filter_row(const uint8_t* row, uint8_t* prev_row, uint8_t* wBuffer, const size_t scanline_sz,const size_t pix_sz){
-    int i,j,sum,min_fil,nsum;
-    uint8_t* tmp;
+    int i,sum,min_fil,nsum;
     min_fil = 0;
     sum = filter_funcs[FILTER_NONE](row,prev_row,wBuffer,scanline_sz,pix_sz);
     for(i = FILTER_NONE+1;i<=FILTER_PAETH;i++){

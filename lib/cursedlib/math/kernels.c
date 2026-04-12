@@ -112,7 +112,7 @@ void cursed_apply_kernel(cursed_img* img, const cursed_kernel* k)
     int               ci;
     int64_t           acc, divided;
     uint64_t          result;
-    const char        channels[3];
+    char        channels[3];
 
     if (!img || !img->pxs || !k) return;
 

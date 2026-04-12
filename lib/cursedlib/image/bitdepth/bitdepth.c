@@ -46,11 +46,7 @@ uint8_t _resample_16b_16b(    const uint8_t* in,
                             int ls,
                             int rs,
                             const size_t sz){
-    size_t i =0;
-    uint16_t* nin,*nout;
-    nin = (uint16_t*)in;
-    nout = (uint16_t*)out;
-    
+    size_t i =0;    
     while(i<sz){
         out[i] = (in[i]<<ls)|(in[i]>>rs);
         i++;

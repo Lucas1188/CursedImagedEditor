@@ -293,7 +293,7 @@ int deflate(bitarray* bBuffer, uint8_t* data,size_t input_sz){
     global_nodes[1] = dnodes;
     global_nodes[2] = clnodes;
     
-    global_distancecodes[0] = distance_codes;
+    global_distancecodes[0] = (char*)distance_codes;
     LOG_I("LZSS portion inputsize: %ld\n",input_size);
     ptr_count = generate_lzss_pointers(input,input_size,lzss_ptrs,WINDOW_SIZE,&pos,count_ldcodes,count_literals); 
     /*Stops processing if we run out of ptr space in the stack*/

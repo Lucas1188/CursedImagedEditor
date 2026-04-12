@@ -7,12 +7,14 @@
 #include "../include/tui_exec.h"
 #include "../include/tui_state.h"
 #include "../include/tui_math.h"
+#include "../include/tui_help.h"
 #include "../include/parser.h"
 #include "../include/cursed_viewer.h"
 #include "../lib/bitmap/bitmap.h"
 #include "../lib/bitmap/bitmap_cursed.h"
 #include "../lib/png/png.h"
 #include "../lib/cursedlib/math/kernels.h"
+#include "../lib/cursedlib/image/draw/draw.h"
 
 #define MAX_FILES 50
 static char file_cache[MAX_FILES][256] = {0};
@@ -243,7 +245,7 @@ int execute_command(CommandAST ast) {
                         layers[i].op_count = 0;
                         layers[i].img_data = loaded_img; 
                         selected_layer_idx = i;
-                        snprintf(msg_buffer, sizeof(msg_buffer), "-> Loaded '%s' (Size: %dx%d)", 
+                        snprintf(msg_buffer, sizeof(msg_buffer), "-> Loaded '%s' (Size: %lu%lu)", 
                                  layers[i].name, loaded_img->width, loaded_img->height);
                         add_log(msg_buffer);
                         return 1;

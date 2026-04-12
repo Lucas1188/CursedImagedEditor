@@ -17,7 +17,7 @@ typedef enum RCODES{
 }RCODES;
 
 static int remap3bytes(const unsigned char* readbytes, unsigned char* writebuffer,size_t input_size){
-  unsigned char b1,b2,b3;
+  unsigned char b1,b2;
   if(input_size>3) return INPUT_ERROR;
   b1 = input_size>1?readbytes[1]>>4:0;
   b2 = input_size>2?readbytes[2]>>6:0;
@@ -43,7 +43,7 @@ static int remap4bytes(const unsigned char* readbytes, unsigned char* writebuffe
   return OK;
 }
 
-int readstring_to_mem(const unsigned char* str, unsigned char** buffer, size_t* size_out){
+int readstring_to_mem(const char* str, unsigned char** buffer, size_t* size_out){
   size_t s = 0;
   char c;
   while(1){
@@ -57,7 +57,7 @@ int readstring_to_mem(const unsigned char* str, unsigned char** buffer, size_t* 
   return OK;
 }
 
-int readfile_to_mem(const unsigned char* filename, unsigned char** buffer,size_t* size_out){
+int readfile_to_mem(const char* filename, unsigned char** buffer,size_t* size_out){
   FILE* f;
   long size;
   if(filename== NULL) return ERROR|INVALID_FILENAME;
@@ -95,7 +95,7 @@ int readfile_to_mem(const unsigned char* filename, unsigned char** buffer,size_t
   *size_out = size;
   return OK;
 }
-int writefile_from_mem(const unsigned char* filename, const unsigned char* buffer,size_t size){
+int writefile_from_mem(const char* filename, const unsigned char* buffer,size_t size){
   FILE* f;
   size_t n;
   f = fopen(filename,"wb");

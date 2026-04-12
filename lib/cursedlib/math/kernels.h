@@ -45,4 +45,6 @@ extern const cursed_kernel CURSED_KERNEL_SOBEL_GY;   /* horizontal edges       *
 */
 void cursed_apply_kernel(cursed_img* img, const cursed_kernel* k);
 
+void cursed_apply_separable_blur(cursed_img* img, int radius, double sigma);
+
 #endif

@@ -20,9 +20,9 @@ typedef enum RCODES {
 /* --- Memory & File I/O Helpers --- */
 /* Note: Remove 'static' from these in your .c file to use them! */
 
-int readstring_to_mem(const unsigned char* str, unsigned char** buffer, size_t* size_out);
-int readfile_to_mem(const unsigned char* filename, unsigned char** buffer, size_t* size_out);
-int writefile_from_mem(const unsigned char* filename, const unsigned char* buffer, size_t size);
+int readstring_to_mem(const char* str, unsigned char** buffer, size_t* size_out);
+int readfile_to_mem(const char* filename, unsigned char** buffer, size_t* size_out);
+int writefile_from_mem(const char* filename, const unsigned char* buffer, size_t size);
 
 /* --- Base64 Size Calculators --- */
 

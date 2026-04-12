@@ -5,7 +5,6 @@ static const char B64URL_TABLE[] =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
 static const unsigned char B64PAD = '=';
 static const unsigned char B64URL_REV_TABLE[256] = {
-    [0 ... 255] = 0xFF,
     ['A']=0,  ['B']=1,  ['C']=2,  ['D']=3,
     ['E']=4,  ['F']=5,  ['G']=6,  ['H']=7,
     ['I']=8,  ['J']=9,  ['K']=10, ['L']=11,

@@ -38,9 +38,7 @@ uint8_t* copy_header(const ihdr_chunk* header){
 png_s create_png_container(ihdr_chunk header){
     
     png_s p;
-    png_chunk hdr,end,*idat;
-
-    static const uint8_t PNG_MAGIC_BYTES[8]= PNG_MAGIC;
+    png_chunk hdr,end;
     
     uint8_t* hdrb;
     
@@ -73,7 +71,7 @@ png_s create_png_container(ihdr_chunk header){
 
 /* 1. FIX THE SIGNATURE: Use png_chunk*** to match your png_s struct exactly */
 int make_idat_chunks(const ihdr_chunk* header, const uint8_t* rawpx, const size_t pxsz, png_chunk*** idat_s) {
-    size_t row = 0, deflatedat, wdat = 0, tidat;
+    size_t row = 0, deflatedat, wdat = 0;
     uint8_t *prow, *dd, *ad;
     uint8_t* upperpad_ = (uint8_t*)calloc(header->width * pxsz, 1);
     uint8_t* write_b = (uint8_t*)calloc(header->height * (header->width * pxsz + 1), 1);
@@ -91,7 +89,6 @@ int make_idat_chunks(const ihdr_chunk* header, const uint8_t* rawpx, const size_
     }
 
     deflatedat = (header->height) * (header->width * pxsz + 1);
-    tidat = deflatedat;
     memset(&cba, 0, sizeof(bitarray));
 
     /* ... (ZLIB Header & Adler32 calculation) ... */

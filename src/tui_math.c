@@ -165,6 +165,7 @@ RGBFloat eval_ast(ASTNode* node, size_t p_idx) {
             res.b = (R.b != 0) ? L.b / R.b : 0; 
             res.a = (R.a != 0) ? L.a / R.a : 0; 
             break;
+        default: break;
     }
     return res;
 }

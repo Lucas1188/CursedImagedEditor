@@ -20,6 +20,11 @@ unsigned int fib[17] = {
   610, 987, 1597   /* include this for >15 bits */
 };
 
+void init_s_huffmancode(huffmancoder* obj){
+  memset(obj,0,sizeof(struct huffmancoder));
+}
+
+
 struct huffnode* make_p_node(uint16_t c, int freq,struct huffnode* l,struct huffnode* r, enum HUFF_NODE_TYPE type){
   huffnode * hn = make_node(c,freq,type);
   hn->node0=l;
@@ -58,14 +63,13 @@ void free_huffman_heap(huffmancoder* hobj,size_t stack_sz){
   if(! hobj) return;
   
   
-  if(hobj->codetable){
-
-    for(i=0;i<stack_sz;i++){
-      if(hobj->codetable[i]){
-        free(hobj->codetable[i]);
-      }
+  
+  for(i=0;i<stack_sz;i++){
+    if(hobj->codetable[i]){
+      free(hobj->codetable[i]);
     }
   }
+  
   if(hobj->revcode_ptr){
     free(hobj->revcode_ptr);
   }
@@ -442,6 +446,7 @@ int parse_symbol(short symbol, unsigned char* data, int* bitpos, int* bytepos){
   if(symbol==EOBCODE){
     return 1;
   }
+  return 0;
 }
 
 void count_clcodes(uint16_t symbol){
