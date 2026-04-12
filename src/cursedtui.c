@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "../include/cursedtui.h"
 #include "../include/tui_state.h"
@@ -9,6 +10,7 @@
 #include "../lib/bitmap/bitmap_cursed.h"
 #include "../lib/png/png.h"
 #include "../lib/bitmap/bitmap.h"
+#include "../include/cursed_viewer.h"
 
 #define MAX_CMD_LEN 256
 
@@ -46,6 +48,22 @@ static cursed_img* cursed_create_proxy(cursed_img* src, int scale) {
     return proxy;
 }
 
+void log_clickable_link(const char* full_path, const char* label) {
+    char link_buffer[2048];
+    
+    /* \033]8;;      -> Start Hyperlink
+       %s            -> The URL
+       \033\\        -> ST (String Terminator) to end URL part
+       %s            -> The visible text
+       \033]8;;      -> Start closing sequence
+       \033\\        -> ST to close the hyperlink entirely
+    */
+    sprintf(link_buffer, "\033]8;;%s\033\\%s\033]8;;\033\\", full_path, label);
+    
+    add_log(link_buffer);
+    /* \033[0m resets colors/underlines; \033]8;;\033\\ resets links */
+    add_log("\033[0m\033]8;;\033\\\n");
+}
 
 void draw_ui() {
     int i;
@@ -115,6 +133,7 @@ void generate_placeholder(){
     }
     
 }
+
 int interactive_mode() {
     char input_buffer[MAX_CMD_LEN];
     cursed_log_callback = add_log; 
@@ -131,8 +150,17 @@ int interactive_mode() {
         fclose(log_f);
     }
     
-    printf("-> Monitor active. Open 'cursed_viewer.html' in your browser.\n");
+    char cwd[1024];
+    char url_buffer[2048];
+    if (getcwd(cwd, sizeof(cwd)) != NULL) {
+        sprintf(url_buffer, "file://%s/cursed_viewer.html", cwd);
+    } else {
+        sprintf(url_buffer, "file://cursed_viewer.html");
+    }
     
+    log_clickable_link(url_buffer, "-> Monitor active. Click to Open 'cursed_viewer.html' in your browser.");
+    
+   
     while(1) {
         draw_ui();
         
@@ -142,10 +170,9 @@ int interactive_mode() {
         }
         
         input_buffer[strcspn(input_buffer, "\n")] = 0; 
-        
         if (strlen(input_buffer) > 0) {
-            char echo[128];
-            snprintf(echo, sizeof(echo), "> %s", input_buffer);
+            char echo[MAX_CMD_LEN];
+            sprintf(echo, "> %.253s", input_buffer);
             add_log(echo);
         }
         

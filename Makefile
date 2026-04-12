@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -ansi -Werror
+CFLAGS = -ansi -Werror -Wall
 DFLAGS ?=    # default empty if not provided
 
 SRC := $(shell find src -name "*.c")
