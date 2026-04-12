@@ -12,7 +12,7 @@
 #include "../lib/bitmap/bitmap.h"
 #include "../include/cursed_viewer.h"
 
-#define MAX_CMD_LEN 256
+#define MAX_CMD_LEN 376
 
 /* Creates a fast, low-res copy of an image for the real-time monitor */
 static cursed_img* cursed_create_proxy(cursed_img* src, int scale) {
@@ -58,10 +58,12 @@ void log_clickable_link(const char* full_path, const char* label) {
        \033]8;;      -> Start closing sequence
        \033\\        -> ST to close the hyperlink entirely
     */
-    sprintf(link_buffer, "\033]8;;%s\033\\%s\033]8;;\033\\", full_path, label);
+    sprintf(link_buffer, "\033]8;;%s\033\\", full_path);
     
     add_log(link_buffer);
+    sprintf(link_buffer, "%s\033]8;;\033\\", label); /* Reset hyperlink */
     /* \033[0m resets colors/underlines; \033]8;;\033\\ resets links */
+    add_log(link_buffer);
     add_log("\033[0m\033]8;;\033\\\n");
 }
 
@@ -172,7 +174,7 @@ int interactive_mode() {
         input_buffer[strcspn(input_buffer, "\n")] = 0; 
         if (strlen(input_buffer) > 0) {
             char echo[MAX_CMD_LEN];
-            sprintf(echo, "> %.253s", input_buffer);
+            sprintf(echo, "> %.372s", input_buffer);
             add_log(echo);
         }
         
