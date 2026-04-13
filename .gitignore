@@ -40,5 +40,9 @@ desktop.ini
 *passwd*
 *.html
 *.js
+*.b64
 
+dist
 emsdk
+
+!index.template.html
