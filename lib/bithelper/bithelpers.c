@@ -5,7 +5,7 @@
 #include <stdint.h>
 
 
-static int ensure_capacity(bitarray *bw, size_t extra_bytes)
+int ensure_capacity(bitarray *bw, size_t extra_bytes)
 {
   size_t newsize;
   uint8_t *tmp;

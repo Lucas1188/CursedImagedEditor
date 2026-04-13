@@ -1,7 +1,9 @@
 #ifndef CURSEDHELPERS_H
 #define CURSEDHELPERS_H
+
 #include <stdio.h>
 extern void print_binary(int code,int len);
+extern void (*cursed_log_callback)(const char* msg);
 
 #ifdef DEBUG
   #define LOG_I(fmt, ...) do { printf(fmt, ##__VA_ARGS__); } while(0)
@@ -21,7 +23,17 @@ extern void print_binary(int code,int len);
 #endif
 
 #ifndef SILENT
-  #define LOG_E(fmt, ...) do { fprintf(stderr, fmt, ##__VA_ARGS__); } while(0)
+  extern void (*cursed_log_callback)(const char* msg);
+
+#define LOG_E(...) do { \
+    char _log_buf[256]; \
+    snprintf(_log_buf, sizeof(_log_buf), __VA_ARGS__); \
+    if (cursed_log_callback) { \
+        cursed_log_callback(_log_buf); \
+    } else { \
+        fprintf(stderr, "%s", _log_buf); \
+    } \
+} while(0)
 #endif
 
 #endif

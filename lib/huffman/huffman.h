@@ -56,9 +56,7 @@ typedef struct huffmancoder{
   struct huffcode* revcodetable[HUFFMAN_ALPHABET_SZ];
 }huffmancoder;
 
-static void init_s_huffmancode(huffmancoder* obj){
-  memset(obj,0,sizeof(struct huffmancoder));
-}
+void init_s_huffmancode(huffmancoder* obj);
 
 extern huffmancoder*  global_codingtable[4];
 extern huffnode**     global_nodes[4];
