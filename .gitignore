@@ -46,3 +46,7 @@ dist
 emsdk
 
 !index.template.html
+!delivery.template.html
+*.pdf
+packer
+cursed-linux

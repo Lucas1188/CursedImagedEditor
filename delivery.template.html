@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resource Manifest | LOTL POC</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #fdfdfd;
+        }
+
+        /* Rapid, erratic jitter for the ghost layers */
+        @keyframes glitch-a {
+            0%, 100% { transform: translate(0); opacity: 0.6; }
+            20% { transform: translate(-2px, 1px); opacity: 0.3; }
+            40% { transform: translate(2px, -1px); opacity: 0.5; }
+            60% { transform: translate(-1px, 2px); opacity: 0.2; }
+        }
+        @keyframes glitch-b {
+            0%, 100% { transform: translate(0); opacity: 0.4; }
+            50% { transform: translate(3px, 0); opacity: 0.1; }
+        }
+
+        .glitch-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: #121212;
+            padding: 16px 40px;
+            border: 1px solid #333;
+            border-radius: 4px;
+            text-decoration: none;
+            position: relative;
+            overflow: hidden;
+            cursor: pointer;
+        }
+
+        .text-container {
+            position: relative;
+            display: inline-block;
+            line-height: 1;
+        }
+
+        .base-text {
+            position: relative;
+            z-index: 3;
+            color: #aaa;
+            font-weight: 500;
+            font-size: 14px;
+            letter-spacing: 0.5px;
+        }
+
+        .ghost-layer {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%;
+            height: 100%;
+            white-space: nowrap;
+            pointer-events: none;
+        }
+
+        .decay { 
+            z-index: 2; 
+            color: #88F; 
+            animation: glitch-a 0.2s infinite; 
+            font-size: 14px;
+        }
+
+        .noise { 
+            z-index: 1; 
+            color: #F44; 
+            animation: glitch-b 1.5s infinite linear;
+            font-size: 12px;
+            letter-spacing: 4px;
+        }
+
+        #frame-view {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 9999;
+            background: #000;
+        }
+    </style>
+</head>
+<body>
+
+<div style="color: #333; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; max-width: 550px; border: 1px solid #e1e1e1; padding: 0; line-height: 1.5; border-radius: 8px; overflow: hidden; margin: 40px auto; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
+    
+    <div style="background: #f8f9fa; padding: 15px 25px; border-bottom: 1px solid #e1e1e1; font-size: 11px; color: #666; font-family: monospace;">
+        Programming Concepts Project | LOTL POC | Cursed Image Editor
+    </div>
+
+    <div style="padding: 30px;">
+        <h2 style="color: #1a1a1a; font-size: 18px; font-weight: 600; margin: 0 0 12px 0;">
+            Serialized Resource Manifest
+        </h2>
+
+        <p style="font-size: 14px; color: #444; margin-bottom: 20px;">
+            The requested technical artifacts have been serialized directly into this resource. This is a standalone handover; <strong>everything is in the URI.</strong>
+        </p>
+
+        <div style="background: #fff9db; border: 1px solid #ffec99; padding: 12px 15px; margin-bottom: 25px; border-radius: 4px;">
+            <div style="font-size: 12px; color: #856404; font-weight: bold; margin-bottom: 3px;">
+                Offline Integrity Check:
+            </div>
+            <div style="font-size: 13px; color: #665; line-height: 1.4;">
+                To verify the resident nature of this resource, you may <strong>sever your connection</strong> before activation. The data is <i style="font-style: italic; letter-spacing: 1.2px; color: #444;">already here &darr;</i>.
+            </div>
+        </div>
+
+        <div style="text-align: center; margin-bottom: 10px;">
+            <a href="{{CONTENT_OF_URL_TXT}}" 
+                target="resident-ship" 
+                onclick="document.getElementById('frame-view').style.display='block';"
+                class="glitch-btn">
+                <div class="text-container">
+                    <span class="base-text">Cursed Image Editor</span>
+                    <span class="ghost-layer decay">C̷u̸r̸s̵e̵d̸ ̸I̷m̵a̶g̵e̵ ̵E̵D̸I̴T̷O̴R̶</span>
+                    <span class="ghost-layer noise">░▒▓█▓▒░░▒▓█▓▒░</span>
+                </div>
+            </a>
+        </div>
+    </div>
+
+    <div style="background: #f8f9fa; padding: 15px 25px; font-size: 10px; color: #999; border-top: 1px solid #e1e1e1; text-align: center;">
+       ARE YOU READY TO GO DOWN THE R̷A̸B̷B̵I̷T̷ H̸O̷L̷E̷?̶ ░▒▓█
+    </div>
+</div>
+
+<div id="frame-view">
+    <iframe name="resident-ship" style="width:100%; height:100%; border:none;"></iframe>
+</div>
+
+</body>
+</html>
