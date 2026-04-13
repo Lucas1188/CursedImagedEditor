@@ -249,4 +249,3 @@ The CursedImageEditor embodies several key principles:
 *"Living off the land means your tools are already there... waiting."*
 
 *May your compressions be efficient and your payloads blend seamlessly with the environment.* 🧙‍♂️💀</content>
-<parameter name="filePath">/home/fgrgr5r/Documents/ProgConcept/LOTR_POC/CursedImagedEditor/README.md
