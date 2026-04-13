@@ -12,7 +12,9 @@ The "cursed" aspect emerges from the deliberate choice to implement everything f
 
 ### The Components of Delivery
 - **cursed-linux**: The ELF executable for Linux environments (x86_64)
-- **cursed.exe**: The PE binary for Windows systems (compiled with MinGW)
+- **cursed.exe**: The PE binary for Windows systems
+- **cursed-mac-x86**: The Mach-O executable for macOS Intel (x86_64)
+- **cursed-mac-arm**: The Mach-O executable for macOS ARM64 (Apple Silicon)
 - **packer**: The compression engine that binds everything together
 - **cursed-delivery.html**: The final self-contained HTML artifact containing all components
 
@@ -68,27 +70,31 @@ Beyond compression, the system provides sophisticated image manipulation with a 
 
 ## 📦 The Delivery Mechanisms
 
-### HTML Artifact (`cursed-delivery.html`) - *Default Delivery Method For Self Curses*
-- **Self-contained HTML** with embedded binaries via Base64 data URLs
+### HTML Artifact (`dist/cursed-delivery.html`) - *Default Delivery Method*
+- **Self-contained HTML** with all platform binaries embedded via Base64 data URLs
+- **Terminal interface** featuring command execution and real-time visualization
+- **Client-side validation** using Pako.js to verify decompression integrity
 - **Minimal external dependencies** - only requires a modern web browser
 
-### PDF Manifest (`Submission_Manifest_GroupX.pdf`) - *Recommended for Distribution*
+### PDF Manifest (`dist/Submission_Manifest_GroupX.pdf`) - *Recommended for Distribution*
 - **Payload embedded within PDF streams** using standard PDF object structure
-- **Stealth delivery** - appears as legitimate documentation while containing executable payloads
+- **Multi-layer compression pipeline**: Base64 encoding → gzip compression → zlib wrapping
+- **Cross-platform compatibility** - PDFs render identically across all systems
+- **Stealth delivery** - appears as legitimate documentation while containing all executable payloads
 - ***More cursed*** - PDFs are ubiquitous but rarely scrutinized for embedded executables
 
 ### The Packer's Operation
-The packer serves as the orchestration engine for payload delivery:
+The packer serves as the orchestration engine for multi-platform payload delivery:
 
 ```bash
-# Generate compressed data URL containing all binaries
-./packer dist.html cursed-linux cursed.exe > url.txt
+# Generate compressed data URL containing all 4 platform binaries
+cd dist && ../packer dist.html cursed-linux cursed.exe cursed-mac-x86 cursed-mac-arm > url.txt && cd ..
 
-# Create HTML delivery artifact (default method)
-./packer -delivery delivery.template.html url.txt > cursed-delivery.html
+# Create HTML delivery artifact (default method - tests payload)
+./packer -delivery delivery.template.html dist/url.txt > dist/cursed-delivery.html
 
 # Generate PDF manifest (recommended for distribution - more cursed!)
-./packer -pdf Submission_Manifest_GroupX.pdf url.txt
+./packer -pdf dist/Submission_Manifest_GroupX.pdf dist/url.txt
 ```
 
 ## 🎭 The Cursed Aesthetic
@@ -144,11 +150,27 @@ For detailed usage examples and advanced compositing workflows, see [`Recipes.md
 ### Monolithic Design
 - **Single compilation unit** - all source files combined into one executable
 - **Preprocessor dispatch** - `#ifdef BUILD_ENGINE` vs `#ifdef BUILD_PACKER`
-- **Cross-platform builds** - GCC for Linux, MinGW for Windows
+- **Unified cross-platform builds** - Zig `zig cc` handles all platform targets
 
 ### Directory Structure
 ```
-├── include/                # Header files
+├── Dockerfile               # Multi-stage build with Zig compiler
+├── Makefile                 # Cross-platform build orchestration
+├── index.template.html      # Web interface template
+├── delivery.template.html   # Delivery artifact template
+├── test.txt                 # Test data
+├── dist/                    # Build artifacts (generated)
+│   ├── cursed-linux         # Linux x86_64 executable
+│   ├── cursed.exe           # Windows x86_64 executable
+│   ├── cursed-mac-x86       # macOS Intel x86_64 executable
+│   ├── cursed-mac-arm       # macOS ARM64 executable
+│   ├── packer               # Compression engine
+│   ├── pako.min.js          # Decompression library (fetched)
+│   ├── dist.html            # Distribution template (stitched)
+│   ├── url.txt              # Generated payload URLs
+│   ├── cursed-delivery.html # HTML delivery artifact
+│   └── Submission_Manifest_GroupX.pdf # PDF manifest
+├── include/                 # Header files
 │   ├── cursed_viewer.h
 │   ├── cursedtui.h
 │   ├── parser.h
@@ -156,42 +178,42 @@ For detailed usage examples and advanced compositing workflows, see [`Recipes.md
 │   ├── tui_help.h
 │   ├── tui_math.h
 │   └── tui_state.h
-├── lib/                    # Core algorithm implementations
-│   ├── cursedhelpers.c/.h  # Utility functions
-│   ├── packer.c            # Packer implementation
-│   ├── search.h            # Search utilities
-│   ├── sort.h              # Sorting utilities
-│   ├── adler32/            # Adler-32 checksum
-│   ├── base64encoder/      # Base64 encoding
-│   ├── bithelper/          # Bit-level I/O
-│   ├── bitmap/             # BMP format support
-│   ├── crc32/              # CRC-32 checksum
-│   ├── cursedlib/          # Image processing core
-│   │   ├── image/          # Core image types
-│   │   │   ├── bitdepth/   # Bit depth conversion
-│   │   │   ├── channel/    # Channel manipulation
-│   │   │   ├── draw/       # Drawing primitives
-│   │   │   ├── filters/    # Image filters
-│   │   │   └── gamma/      # Gamma correction
-│   │   └── math/           # Mathematical kernels
-│   ├── deflate/            # DEFLATE compression
-│   ├── gzip/               # Gzip wrapper
-│   ├── huffman/            # Huffman coding
-│   ├── lzss/               # LZ77 string matching
-│   ├── png/                # PNG format support
-│   └── zlib/               # Zlib wrapper
-├── src/                    # Application logic
-│   ├── cursed.c            # Main entry point
-│   ├── cursed_viewer.c     # Viewer implementation
-│   ├── cursedtui.c         # Terminal UI
-│   ├── parser.c            # Command parsing
-│   ├── tui_exec.c          # Command execution
-│   ├── tui_help.c          # Help system
-│   ├── tui_math.c          # Mathematical expressions
-│   └── tui_state.c         # UI state management
-└── test/                   # Test files
-    ├── b64test.c           # Base64 tests
-    └── sorttest.c          # Sort tests
+├── lib/                     # Core algorithm implementations
+│   ├── cursedhelpers.c/.h   # Utility functions
+│   ├── packer.c             # Packer implementation
+│   ├── search.h             # Search utilities
+│   ├── sort.h               # Sorting utilities
+│   ├── adler32/             # Adler-32 checksum
+│   ├── base64encoder/       # Base64 encoding
+│   ├── bithelper/           # Bit-level I/O
+│   ├── bitmap/              # BMP format support
+│   ├── crc32/               # CRC-32 checksum
+│   ├── cursedlib/           # Image processing core
+│   │   ├── image/           # Core image types
+│   │   │   ├── bitdepth/    # Bit depth conversion
+│   │   │   ├── channel/     # Channel manipulation
+│   │   │   ├── draw/        # Drawing primitives
+│   │   │   ├── filters/     # Image filters
+│   │   │   └── gamma/       # Gamma correction
+│   │   └── math/            # Mathematical kernels
+│   ├── deflate/             # DEFLATE compression
+│   ├── gzip/                # Gzip wrapper
+│   ├── huffman/             # Huffman coding
+│   ├── lzss/                # LZ77 string matching
+│   ├── png/                 # PNG format support
+│   └── zlib/                # Zlib wrapper
+├── src/                     # Application logic
+│   ├── cursed.c             # Main entry point
+│   ├── cursed_viewer.c      # Viewer implementation
+│   ├── cursedtui.c          # Terminal UI
+│   ├── parser.c             # Command parsing
+│   ├── tui_exec.c           # Command execution
+│   ├── tui_help.c           # Help system
+│   ├── tui_math.c           # Mathematical expressions
+│   └── tui_state.c          # UI state management
+└── test/                    # Test files
+    ├── b64test.c            # Base64 tests
+    └── sorttest.c           # Sort tests
 ```
 
 ### Dependencies
@@ -207,23 +229,51 @@ For detailed technical information:
 
 ## ⚔️ Building from Source
 
+### Requirements
+- **Zig 0.16.0+** (provides unified cross-compilation via `zig cc`)
+- **Make** (GNU Make for orchestration)
+- **curl** (for fetching Pako.js)
+
+### Using Docker (Recommended for Consistent Builds)
 ```bash
-# Individual components
-make cursed-linux    # Linux executable (primary development target)
-make cursed.exe      # Windows executable (cross-compiled)
-make packer          # Compression and delivery engine
+# Build the Docker image with Zig toolchain
+docker build -t cursed-builder .
+
+# Run the build with proper permissions and caching
+docker run --rm -u $(id -u):$(id -g) -e ZIG_GLOBAL_CACHE_DIR=/tmp/zig-cache \
+  -v $(pwd):/project cursed-builder make all
+```
+
+The `Dockerfile` sets up Zig 0.16.0-dev with all dependencies, ensuring identical builds across platforms. The `ZIG_GLOBAL_CACHE_DIR` environment variable redirects Zig's cache to a temporary directory, and `-u $(id -u):$(id -g)` ensures artifacts are created with your user's permissions (not root).
+
+### Local Build Commands
+```bash
+# Individual platform binaries (outputs to dist/)
+make dist/cursed-linux    # Linux x86_64
+make dist/cursed.exe      # Windows x86_64
+make dist/cursed-mac-x86  # macOS Intel (x86_64)
+make dist/cursed-mac-arm  # macOS ARM64 (Apple Silicon)
+make dist/packer          # Compression and delivery engine
 
 # Bundling and delivery
-make bundle          # Create compressed bundle with Pako.js and data URLs
-make deliver         # Generate HTML delivery artifact (cursed-delivery.html)
-make pdf             # Generate PDF manifest (Submission_Manifest_GroupX.pdf)
+make bundle               # Create compressed bundle with Pako.js and data URLs
+make deliver              # Generate HTML delivery artifact (dist/cursed-delivery.html)
+make pdf                  # Generate PDF manifest (dist/Submission_Manifest_GroupX.pdf)
 
 # Everything (default target - builds HTML delivery)
-make all
+make all                  # Equivalent to: make deliver pdf
 
-# Clean build artifacts
-make clean
+# Clean all build artifacts
+make clean               # Remove entire dist/ directory
 ```
+
+### Build System Details
+The build system uses **Zig's unified C compiler** (`zig cc`) which simplifies cross-compilation by handling:
+- **Target triple specification** (Linux glibc, Windows GNU, macOS Intel, macOS ARM)
+- **Compiler toolchain selection** automatically
+- **Platform-specific linking** and runtime dependencies
+
+This replaces the previous approach of using separate compilers (GCC, MinGW, etc.) with a single, portable compiler infrastructure.
 
 ## 🎯 Design Philosophy
 

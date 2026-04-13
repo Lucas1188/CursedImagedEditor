@@ -145,9 +145,22 @@
         function getPlatform() {
             const ua = navigator.userAgent.toLowerCase();
             if (ua.includes("win")) return "windows";
-            if (ua.includes("mac")) return "mac";
+            if (ua.includes("mac")) {
+                // Detect Apple Silicon (ARM) vs Intel
+                // Standard check for modern browsers
+                return (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) || 
+                    (ua.includes("arm") || ua.includes("apple")) ? "mac-arm" : "mac-x86";
+            }
             return "linux";
         }
+
+        // Update your mapping
+        const map = { 
+            "windows": "cursed.exe", 
+            "mac-arm": "cursed-mac-arm", 
+            "mac-x86": "cursed-mac-x86", 
+            "linux": "cursed-linux" 
+        };
 
         function untar(buf) {
             let offset = 0; const files = {};

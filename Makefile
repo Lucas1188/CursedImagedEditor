@@ -1,51 +1,86 @@
-CC_LINUX = gcc
-CC_WIN   = x86_64-w64-mingw32-gcc
+# Toolchain Selector: 'zig' (default) or 'gcc'
+MODE ?= zig
+
+# Original Flags & Includes
 CFLAGS   = -ansi
 INCLUDES = -Ilib -Isrc
+DIST      = dist
+ALL_C     = $(shell find lib src -name "*.c")
 
-ALL_C    = $(shell find lib src -name "*.c")
-BINS     = cursed-linux cursed.exe
-PACKER   = ./packer
-TPL      = index.template.html
-UNPACKER = dist.html
-URL_FILE = url.txt
-TDL	  	 = delivery.template.html
-FINAL_OUT = cursed-delivery.html
-FINAL_PDF    = Submission_Manifest_GroupX.pdf
+# Artifact Paths
+BIN_NAMES = cursed-linux cursed.exe cursed-mac-x86 cursed-mac-arm
 
-.PHONY: all bundle clean
+# 2. Use the toggle ONLY to switch compilers
+ifeq ($(MODE), zig)
+	CFLAGS   += -O3
+	CC_LINUX  = zig cc -target x86_64-linux-gnu
+    CC_WIN    = zig cc -target x86_64-windows-gnu
+    CC_PACKER = zig cc
+else
+    # Classic Mode (GCC / MinGW)
+    CC_LINUX  = gcc
+    CC_WIN    = x86_64-w64-mingw32-gcc
+    CC_PACKER = gcc
+endif
 
-all: deliver
+BINS      = $(addprefix $(DIST)/, $(BIN_NAMES))
+PACKER    = $(DIST)/packer
+TPL       = index.template.html
+TDL       = delivery.template.html
+UNPACKER  = $(DIST)/dist.html
+URL_FILE  = $(DIST)/url.txt
+FINAL_OUT = $(DIST)/cursed-delivery.html
+FINAL_PDF = $(DIST)/Submission_Manifest_GroupX.pdf
 
-$(PACKER): $(ALL_C)
-	$(CC_LINUX) $(CFLAGS) -DBUILD_PACKER $(ALL_C) $(INCLUDES) -o $@
+.PHONY: all bundle deliver pdf clean prepare
 
-cursed-linux: $(ALL_C)
-	$(CC_LINUX) $(CFLAGS) -DBUILD_ENGINE $(ALL_C) $(INCLUDES) -o $@
+all: clean deliver pdf
 
-cursed.exe: $(ALL_C)
-	$(CC_WIN) $(CFLAGS) -DBUILD_ENGINE $(ALL_C) $(INCLUDES) -o $@
+prepare:
+	@mkdir -p $(DIST)
+
+# The Packer is always built for the HOST machine
+$(PACKER): $(ALL_C) | prepare
+	@echo ">>> Building Host Packer ($(CC_PACKER))..."
+	@$(CC_PACKER) $(CFLAGS) -DBUILD_PACKER $(ALL_C) $(INCLUDES) -o $@
+
+# Linux Target
+$(DIST)/cursed-linux: $(ALL_C) | prepare
+	@echo ">>> Compiling Linux via $(CC_LINUX)..."
+	@$(CC_LINUX) $(CFLAGS) -DBUILD_ENGINE $(ALL_C) $(INCLUDES) -o $@
+
+# Windows Target
+$(DIST)/cursed.exe: $(ALL_C) | prepare
+	@echo ">>> Compiling Windows via $(CC_WIN)..."
+	@$(CC_WIN) $(CFLAGS) -DBUILD_ENGINE $(ALL_C) $(INCLUDES) -o $@
+
+# Mac Targets (Only active in Zig mode)
+$(DIST)/cursed-mac-%: $(ALL_C) | prepare
+ifeq ($(MODE), zig)
+	@echo ">>> Cross-compiling Mac $*..."
+	@zig cc -target $(if $(findstring x86,$*),x86_64-macos,aarch64-macos) $(CFLAGS) -DBUILD_ENGINE $(ALL_C) $(INCLUDES) -o $@
+else
+	@echo ">>> [STUB] Creating byte-bearing placeholder for $*..."
+	@echo "This binary was built in MODE=gcc. Re-run with MODE=zig to generate the native Mac artifact." > $@
+endif
 
 bundle: $(PACKER) $(BINS)
-	@echo "Fetching Pako for serverless autonomy..."
-	@curl -s https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js > pako.min.js
-#We use Pako to handle decompression of our url as a form of validation that our program is correctly encoding and packing the data. And we were not about to write our own decompressor in JS just for that, so here we are.
-	@echo "Stitching master template..."
-#This is the only time we use sed in the entire process, so we can be a bit hacky and just insert the pako.min.js content directly into the HTML template. This keeps our bundle self-contained without needing to manage multiple files.
-	@sed -e '/__PAKO_MIN_JS__/{r pako.min.js' -e 'd}' index.template.html > $(UNPACKER)	
-	@echo ">>> Generating Master Data URL via Our-Packer..."
-	./$(PACKER) $(UNPACKER) $(BINS) > url.txt
-	@echo "[SUCCESS] Data URL written to url.txt"
+	@echo ">>> Checking Resident Dependencies..."
+	@if [ ! -f $(DIST)/pako.min.js ]; then \
+		(cp /opt/pako.min.js $(DIST)/pako.min.js 2>/dev/null || \
+		curl -s https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js > $(DIST)/pako.min.js); \
+	fi
+	@echo ">>> Stitching master template..."
+	@sed -e '/__PAKO_MIN_JS__/{r $(DIST)/pako.min.js' -e 'd}' $(TPL) > $(UNPACKER)
+	@echo ">>> Generating Master Data URL..."
+	@(cd $(DIST) && ../$(PACKER) dist.html $(BIN_NAMES) > url.txt)
+	@echo ">>> OK!"
 
 deliver: bundle
-	@echo ">>> Assembling Final Delivery Artifact..."
-	@$(PACKER) -delivery $(TDL) $(URL_FILE) > $(FINAL_OUT)
-	@echo "[SUCCESS] The file is now LITERALLY in $(FINAL_OUT)"
+	@./$(PACKER) -delivery $(TDL) $(URL_FILE) > $(FINAL_OUT)
 
 pdf: bundle
-	@echo ">>> Encapsulating buffer into Binary PDF Carrier..."
-	@$(PACKER) -pdf $(FINAL_PDF) $(URL_FILE)
-	@echo "[SUCCESS] PDF Manifest created at $(FINAL_PDF)"
+	@./$(PACKER) -pdf $(FINAL_PDF) $(URL_FILE)
 
 clean:
-	rm -rf $(BINS) $(PACKER) url.txt
+	@rm -rf $(DIST)
