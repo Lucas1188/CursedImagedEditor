@@ -1,230 +1,164 @@
-#ifdef USE_PACKER
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <ctype.h>
+#include <sys/stat.h>
 #include "bithelper/bithelpers.h"
-#include "cursedhelpers.h"
 #include "gzip/gzip.h"
 #include "base64encoder/b64e.h"
+#include "cursedhelpers.h"
+#include "base64encoder/b64tbl.h"
 
-/* ---------------- MOCK LOGGER ---------------- */
-void console_log_mock(const char* msg) {
-    printf("%s", msg);
+#ifdef BUILD_PACKER
+
+/* * -----------------------------------------------------------------
+ * BASE64 IMPLEMENTATION (MATCHING YOUR TEST DRIVER)
+ * -----------------------------------------------------------------
+ */
+
+static int local_remap3bytes(const unsigned char* readbytes, unsigned char* writebuffer, size_t input_size) {
+    unsigned char b1, b2;
+    if (input_size > 3) return 4; /* INPUT_ERROR */
+    b1 = input_size > 1 ? readbytes[1] >> 4 : 0;
+    b2 = input_size > 2 ? readbytes[2] >> 6 : 0;
+    writebuffer[0] = B64URL_TABLE[readbytes[0] >> 2];
+    writebuffer[1] = B64URL_TABLE[((readbytes[0] & 3) << 4) | b1];
+    writebuffer[2] = input_size > 1 ? B64URL_TABLE[((readbytes[1] & 15) << 2) | b2] : B64PAD;
+    writebuffer[3] = input_size > 2 ? B64URL_TABLE[readbytes[2] & 63] : B64PAD;
+    return 1; /* OK */
 }
-void (*cursed_log_callback)(const char*) = console_log_mock;
 
-/* ---------------- BIT BUFFER ---------------- */
-void bitarray_init(bitarray *b, size_t initial_size) {
-    b->data = (uint8_t*)malloc(initial_size);
-    b->size = initial_size;
-    b->used = 0;
-    b->bitbuf = 0;
-    b->bitcount = 0;
+static void local_getb64size(long fsize, long* bsize_out, long* remainder_out, long* blocks_out) {
+    *remainder_out = fsize % 3;
+    *blocks_out = fsize / 3 + (*remainder_out > 0 ? 1 : 0);
+    /* Total size including null terminator */
+    *bsize_out = fsize / 3 * 4 + (fsize % 3 > 0 ? 4 : 0) + 1;
 }
 
-void bitarray_free(bitarray *b) {
-    if (b->data) free(b->data);
-    b->data = NULL;
-    b->size = 0;
-    b->used = 0;
-}
-
-/* ---------------- EXTERNALS ---------------- */
-extern uint32_t write_gzip_from_file(const char* filename, bitarray* bData);
-
-extern int _getb64size(long fsize, long* bsize_out, long* remainder_out, long* blocks_out);
-
-extern int b64_encode(
-    const unsigned char* in,
-    size_t in_size,
-    unsigned char* out,
-    size_t* out_size
-);
-
-/* ---------------- TAR HEADER ---------------- */
-typedef struct {
-    char name[100]; char mode[8]; char uid[8]; char gid[8];
-    char size[12]; char mtime[12]; char chksum[8]; char typeflag;
-    char linkname[100]; char magic[6]; char version[2];
-    char uname[32]; char gname[32]; char devmajor[8]; char devminor[8];
-    char prefix[155]; char pad[12];
-} tar_header;
-
-void calc_tar_checksum(tar_header* h) {
-    unsigned int sum = 0;
-    unsigned char* p = (unsigned char*)h;
+/* The signature your pipeline expects */
+int b64_encode(const unsigned char* in, size_t in_size, unsigned char* out, size_t* out_size) {
+    long bsize, remainder, blocks;
     size_t i;
-
-    memset(h->chksum, ' ', 8);
-
-    for (i = 0; i < 512; i++)
-        sum += p[i];
-
-    sprintf(h->chksum, "%06o", sum);
-    h->chksum[6] = '\0';
-    h->chksum[7] = ' ';
-}
-
-/* ---------------- MINIFIER ---------------- */
-size_t minify_c_file(FILE* in, FILE* out) {
-    int c;
-    int in_string = 0, in_char = 0, in_macro = 0, in_comment = 0, last_space = 0;
-    size_t bytes = 0;
-
-    while ((c = fgetc(in)) != EOF) {
-
-        if (!in_comment && !in_macro) {
-            if (c == '"' && !in_char) in_string = !in_string;
-            if (c == '\'' && !in_string) in_char = !in_char;
-        }
-
-        if (!in_string && !in_char && !in_comment && c == '#')
-            in_macro = 1;
-
-        if (in_macro && c == '\n')
-            in_macro = 0;
-
-        if (!in_string && !in_char && c == '/') {
-            int next = fgetc(in);
-            if (next == '*') { in_comment = 1; continue; }
-            ungetc(next, in);
-        }
-
-        if (in_comment) {
-            if (c == '*') {
-                int next = fgetc(in);
-                if (next == '/') { in_comment = 0; continue; }
-                ungetc(next, in);
-            }
-            continue;
-        }
-
-        if (!in_string && !in_char && !in_macro && isspace(c)) {
-            if (!last_space) {
-                fputc(' ', out);
-                bytes++;
-                last_space = 1;
-            }
-            continue;
-        } else {
-            last_space = 0;
-        }
-
-        fputc(c, out);
-        bytes++;
+    
+    local_getb64size((long)in_size, &bsize, &remainder, &blocks);
+    
+    for (i = 0; i < (size_t)(in_size / 3); i++) {
+        local_remap3bytes(&in[i * 3], &out[i * 4], 3);
     }
-
-    return bytes;
+    
+    if (remainder != 0) {
+        /* Align with your driver: write to the block just before the null terminator */
+        local_remap3bytes(&in[in_size - remainder], &out[bsize - 5], remainder);
+    }
+    
+    out[bsize - 1] = '\0';
+    if (out_size) *out_size = (size_t)(bsize - 1); /* Return length without null */
+    return 0; /* SUCCESS in your pipeline signature */
 }
-/* ---------------- MAIN PACKER ---------------- */
+
+/* * -----------------------------------------------------------------
+ * PACKER LOGIC
+ * -----------------------------------------------------------------
+ */
+
+void packer_internal_log(const char* msg) {
+    fprintf(stderr, "[PACKER] %s\n", msg);
+}
+void (*cursed_log_callback)(const char* msg) = packer_internal_log;
+
+void pack_tar_header(FILE* f, const char* name, size_t size) {
+    unsigned char header[512];
+    memset(header, 0, 512);
+    strncpy((char*)header, name, 100);
+    sprintf((char*)header + 124, "%011lo", (unsigned long)size);
+    memcpy(header + 257, "ustar", 5);
+    unsigned int sum = 0; int i;
+    memset(header + 148, ' ', 8);
+    for (i = 0; i < 512; i++) sum += header[i];
+    sprintf((char*)header + 148, "%06o", sum);
+    fwrite(header, 1, 512, f);
+}
+
 int main(int argc, char** argv) {
-
-    int i;
-    FILE *tar_stream, *final_out;
+    bitarray bData = {0};
+    FILE *tar_f, *fTpl;
     const char* temp_tar = "temp_payload.tar";
-
-    bitarray gz_data;
-
-    long b64_sz, rem, blocks;
-    unsigned char *b64_buf;
-    size_t final_b64_sz;
-    uint32_t gz_size;
-
-    char zero[512] = {0};
+    char *tpl_buf, *marker_pos, *final_html;
+    unsigned char *b64_payload, *b64_final;
+    size_t b64_payload_sz = 0, b64_final_sz = 0;
+    long tpl_sz;
+    int i;
 
     if (argc < 3) {
-        printf("Usage: %s <out.b64> <files...>\n", argv[0]);
+        fprintf(stderr, "Usage: %s <template.html> <binaries...>\n", argv[0]);
         return 1;
     }
 
-    /* ---------------- TAR ---------------- */
-    printf("[PACKER] tar...\n");
-
-    tar_stream = fopen(temp_tar, "wb");
-    if (!tar_stream) return 1;
-
+    /* 1. ARCHIVE BINARIES TO TAR */
+    tar_f = fopen(temp_tar, "wb");
+    if (!tar_f) return 1;
     for (i = 2; i < argc; i++) {
+        struct stat st;
+        if (stat(argv[i], &st) != 0) continue;
+        FILE* src = fopen(argv[i], "rb");
+        if (!src) continue;
+        pack_tar_header(tar_f, argv[i], (size_t)st.st_size);
+        unsigned char buf[8192]; size_t r;
+        while ((r = fread(buf, 1, sizeof(buf), src)) > 0) fwrite(buf, 1, r, tar_f);
+        size_t padding = (512 - (st.st_size % 512)) % 512;
+        if (padding) { unsigned char p[512] = {0}; fwrite(p, 1, padding, tar_f); }
+        fclose(src);
+    }
+    unsigned char eoa[1024] = {0}; fwrite(eoa, 1, 1024, tar_f);
+    fclose(tar_f);
 
-        FILE *in = fopen(argv[i], "rb");
-        if (!in) continue;
+    /* 2. GZIP THE TAR */
+    if (write_gzip_from_file(temp_tar, &bData) == (uint32_t)-1) return 1;
+    bitarray_flush(&bData);
 
-        FILE *tmp = tmpfile();
+    /* 3. BASE64 ENCODE (INNER PAYLOAD) */
+    long p_bsize, p_rem, p_blocks;
+    local_getb64size((long)bData.used, &p_bsize, &p_rem, &p_blocks);
+    b64_payload = malloc(p_bsize);
+    b64_encode(bData.data, bData.used, b64_payload, &b64_payload_sz);
 
-        size_t sz = minify_c_file(in, tmp);
-        fclose(in);
+    /* 4. TEMPLATE INJECTION */
+    fTpl = fopen(argv[1], "rb");
+    if (!fTpl) return 1;
+    fseek(fTpl, 0, SEEK_END); tpl_sz = ftell(fTpl); rewind(fTpl);
+    tpl_buf = malloc(tpl_sz + 1);
+    fread(tpl_buf, 1, tpl_sz, fTpl); tpl_buf[tpl_sz] = '\0';
+    fclose(fTpl);
 
-        tar_header h;
-        memset(&h, 0, sizeof(h));
+    marker_pos = strstr(tpl_buf, "__PAYLOAD__");
+    if (!marker_pos) return 1;
 
-        strncpy(h.name, argv[i], 99);
-        strcpy(h.mode, "0000644");
-        sprintf(h.size, "%011lo", (unsigned long)sz);
-        strcpy(h.magic, "ustar");
+    size_t head_len = marker_pos - tpl_buf;
+    size_t tail_len = tpl_sz - head_len - strlen("__PAYLOAD__");
+    size_t final_html_sz = head_len + b64_payload_sz + tail_len;
+    final_html = malloc(final_html_sz + 1);
 
-        h.version[0] = '0';
-        h.version[1] = '0';
+    memcpy(final_html, tpl_buf, head_len);
+    memcpy(final_html + head_len, b64_payload, b64_payload_sz);
+    memcpy(final_html + head_len + b64_payload_sz, marker_pos + strlen("__PAYLOAD__"), tail_len);
+    final_html[final_html_sz] = '\0';
 
-        calc_tar_checksum(&h);
-
-        fwrite(&h, 1, 512, tar_stream);
-
-        rewind(tmp);
-        int c;
-        while ((c = fgetc(tmp)) != EOF)
-            fputc(c, tar_stream);
-
-        fclose(tmp);
-
-        size_t pad = 512 - (sz % 512);
-        if (pad < 512)
-            fwrite(zero, 1, pad, tar_stream);
+    /* 5. FINAL BASE64 (DATA URL) */
+    long f_bsize, f_rem, f_blocks;
+    local_getb64size((long)final_html_sz, &f_bsize, &f_rem, &f_blocks);
+    b64_final = malloc(f_bsize);
+    
+    if (b64_encode((unsigned char*)final_html, final_html_sz, b64_final, &b64_final_sz) == 0) {
+        printf("data:text/html;base64,");
+        fwrite(b64_final, 1, b64_final_sz, stdout);
+        printf("\n");
     }
 
-    fwrite(zero, 1, 512, tar_stream);
-    fwrite(zero, 1, 512, tar_stream);
-    fclose(tar_stream);
-
-    /* ---------------- GZIP ---------------- */
-    printf("[PACKER] gzip...\n");
-
-    bitarray_init(&gz_data, 1024 * 1024);
-
-    gz_size = write_gzip_from_file(temp_tar, &gz_data);
-
-    if (gz_size == 0)
-        gz_size = gz_data.used;
-
-    if (gz_size == 0 || !gz_data.data) {
-        printf("gzip failed\n");
-        return 1;
-    }
-
-    /* ---------------- BASE64 ---------------- */
-    printf("[PACKER] b64...\n");
-
-    _getb64size(gz_size, &b64_sz, &rem, &blocks);
-
-    b64_buf = malloc(b64_sz + 4);
-
-    if (!b64_buf) return 1;
-
-    b64_encode(gz_data.data, gz_size, b64_buf, &final_b64_sz);
-
-    b64_buf[final_b64_sz] = '\0';
-
-    final_out = fopen(argv[1], "w");
-    if (final_out) {
-        fwrite(b64_buf, 1, final_b64_sz, final_out);
-        fclose(final_out);
-    }
-
-    free(b64_buf);
-    bitarray_free(&gz_data);
+    /* CLEANUP */
     remove(temp_tar);
-
-    printf("[PACKER] done\n");
+    free(b64_payload); free(b64_final);
+    free(tpl_buf); free(final_html);
+    if (bData.data) free(bData.data);
+    
     return 0;
 }
 #endif

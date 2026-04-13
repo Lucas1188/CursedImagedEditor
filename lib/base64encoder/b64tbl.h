@@ -2,7 +2,7 @@
 #define B64URL_H
 
 static const char B64URL_TABLE[] =
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 static const unsigned char B64PAD = '=';
 static const unsigned char B64URL_REV_TABLE[256] = {
     ['A']=0,  ['B']=1,  ['C']=2,  ['D']=3,
@@ -22,8 +22,8 @@ static const unsigned char B64URL_REV_TABLE[256] = {
     ['0']=52, ['1']=53, ['2']=54, ['3']=55,
     ['4']=56, ['5']=57, ['6']=58, ['7']=59,
     ['8']=60, ['9']=61,
-    ['-']=62,
-    ['_']=63,
+    ['+']=62,
+    ['/']=63,
     ['=']=0    /* padding handled separately*/
 };
 #endif

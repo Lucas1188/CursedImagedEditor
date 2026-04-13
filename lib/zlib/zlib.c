@@ -17,7 +17,7 @@ uint32_t get_file_ad32_fptr_fsz(const char* filename,FILE** f_out,size_t* size_o
 
     LOG_I("Calculating AD32 for file: %s\n", filename);
     *f_out = fopen(filename,"rb");
-    if(!*f_out){LOG_E("File ptr closed without warning!\n");};
+    if(!*f_out){LOG_E("File ptr closed without warning! tried zlib: %s\n", filename);};
     uint8_t buf[4096];
     size_t read;
     size_t total =0;

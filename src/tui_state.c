@@ -8,8 +8,9 @@ int selected_layer_idx = -1;
 char window_log[MAX_HISTORY][128] = {0};
 int log_count = 0;
 tcursed_pix current_color;
+#ifndef BUILD_PACKER
 void (*cursed_log_callback)(const char* msg) = NULL;
-
+#endif
 /* ... below int selected_layer_idx = -1; ... */
 int canvas_width = 0;
 int canvas_height = 0;

@@ -1,51 +1,31 @@
-CC = gcc
-CFLAGS = -ansi -Werror -Wall
-DFLAGS ?=
+CC_LINUX = gcc
+CC_WIN   = x86_64-w64-mingw32-gcc
+CFLAGS   = -ansi
+INCLUDES = -Ilib -Isrc
 
-# =========================
-# SOURCE BUILD
-# =========================
-SRC := $(shell find src -type f -name "*.c")
-LIB := $(shell find lib -type f -name "*.c")
+ALL_C    = $(shell find lib src -name "*.c")
+BINS     = cursed-linux cursed.exe
+PACKER   = ./packer
+TPL      = index.template.html
 
-OBJ := $(SRC:%.c=build/%.o) $(LIB:%.c=build/%.o)
+.PHONY: all bundle clean
 
-TARGET = cursed
+all: bundle
 
-.PHONY: all clean payload html url bundle
+$(PACKER): $(ALL_C)
+	$(CC_LINUX) $(CFLAGS) -DBUILD_PACKER $(ALL_C) $(INCLUDES) -o $@
 
-all: $(TARGET)
+cursed-linux: $(ALL_C)
+	$(CC_LINUX) $(CFLAGS) -DBUILD_ENGINE $(ALL_C) $(INCLUDES) -o $@
 
-$(TARGET): $(OBJ)
-	$(CC) $(OBJ) -o $@
+cursed.exe: $(ALL_C)
+	$(CC_WIN) $(CFLAGS) -DBUILD_ENGINE $(ALL_C) $(INCLUDES) -o $@
 
-build/%.o: %.c
-	mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $(DFLAGS) -c $< -o $@
+# The final "bundle" is now just the output of the packer redirected to a file
+bundle: $(PACKER) $(BINS)
+	@echo ">>> Generating Master Data URL via C-Packer..."
+	./$(PACKER) $(TPL) $(BINS) > url.txt
+	@echo "[SUCCESS] Data URL written to url.txt"
 
 clean:
-	rm -rf build $(TARGET) dist
-
-# =========================
-# OUTPUT PIPELINE
-# =========================
-DIST = dist
-BIN_B64 = $(DIST)/payload.b64
-HTML = $(DIST)/index.html
-URL = $(DIST)/url.txt
-
-payload: $(TARGET)
-	mkdir -p $(DIST)
-	base64 $(TARGET) | tr -d '\n' > $(BIN_B64)
-
-html: payload
-	mkdir -p $(DIST)
-	sed 's|__PAYLOAD__|PLACEHOLDER|' index.template.html > $(HTML).tmp
-	awk 'BEGIN{while((getline line < "$(BIN_B64)")>0) b64=b64 line} {gsub("PLACEHOLDER", b64); print}' $(HTML).tmp > $(HTML)
-	rm $(HTML).tmp
-
-url: html
-	@echo "data:text/html;base64,$$(base64 < $(HTML) | tr -d '\n')" > $(URL)
-	@echo "[OK] generated $(URL)"
-
-bundle: url
+	rm -rf $(BINS) $(PACKER) url.txt

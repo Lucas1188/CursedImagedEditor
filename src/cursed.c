@@ -53,7 +53,7 @@ static int gzip_file_to(const char* src, const char* dst) {
     free(bBuffer.data);
     return 1;
 }
-
+#ifdef BUILD_ENGINE
 int main(int argc, char* argv[]) {
     bitmap* bmp;
     png_s* png;
@@ -85,6 +85,14 @@ int main(int argc, char* argv[]) {
     do_png  = has_flag(argc, argv, "-png");
     do_gzip = has_flag(argc, argv, "-gzip");
 
+      /* 5. POST-PROCESS (COMPRESSION) STAGE */
+    if (do_gzip) {
+        if (!gzip_file_to(target_out_path, output_file)) {
+            remove(target_out_path); /* Clean up temp file on fail */
+            return 1;
+        }
+        remove(target_out_path); /* Clean up temp file on success */
+    }
     /* 3. INPUT STAGE */
     bmp = read_bitmap(input_file);
     if (!bmp) {
@@ -116,14 +124,8 @@ int main(int argc, char* argv[]) {
     
     free_bitmap(bmp); /* Free original image memory before gzip phase */
 
-    /* 5. POST-PROCESS (COMPRESSION) STAGE */
-    if (do_gzip) {
-        if (!gzip_file_to(target_out_path, output_file)) {
-            remove(target_out_path); /* Clean up temp file on fail */
-            return 1;
-        }
-        remove(target_out_path); /* Clean up temp file on success */
-    }
+  
 
     return 0;
 }
+#endif

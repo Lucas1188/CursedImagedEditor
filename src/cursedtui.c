@@ -1,6 +1,14 @@
 #include <stdio.h>
 #include <string.h>
-#include <unistd.h>
+#include <stdlib.h>
+#include <limits.h>
+
+#ifdef _WIN32
+#include <direct.h>
+#define getcwd _getcwd
+#else
+char *getcwd(char *buf, size_t size);
+#endif
 
 #include "../include/cursedtui.h"
 #include "../include/tui_state.h"
@@ -135,7 +143,7 @@ void generate_placeholder(){
     }
     
 }
-
+#ifndef BUILD_PACKER
 int interactive_mode() {
     char input_buffer[MAX_CMD_LEN];
     cursed_log_callback = add_log; 
@@ -242,3 +250,4 @@ int interactive_mode() {
     clear_screen();
     return 1;
 }
+#endif
