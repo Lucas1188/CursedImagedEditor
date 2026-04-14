@@ -13,10 +13,10 @@ typedef enum RCODES{
   FILE_ERROR=16,
   INSUF_MEM = 32,
   INVALID_B64 = 64,
-  BAD_WRITE = 128,
+  BAD_WRITE = 128
 }RCODES;
 
-static int remap3bytes(const unsigned char* readbytes, unsigned char* writebuffer,size_t input_size){
+int remap3bytes(const unsigned char* readbytes, unsigned char* writebuffer,size_t input_size){
   unsigned char b1,b2;
   if(input_size>3) return INPUT_ERROR;
   b1 = input_size>1?readbytes[1]>>4:0;
@@ -27,7 +27,7 @@ static int remap3bytes(const unsigned char* readbytes, unsigned char* writebuffe
   writebuffer[3] = input_size>2?  B64URL_TABLE[readbytes[2]&63] : B64PAD;
   return OK;
 }
-static int remap4bytes(const unsigned char* readbytes, unsigned char* writebuffer){
+int remap4bytes(const unsigned char* readbytes, unsigned char* writebuffer){
   int b3,b4;
   
   b3 = readbytes[2] == B64PAD;
@@ -84,7 +84,8 @@ int readfile_to_mem(const char* filename, unsigned char** buffer,size_t* size_ou
       return ERROR|INSUF_MEM;
   }
 
-  size_t read = fread(*buffer, sizeof(**buffer), size, f);
+  size_t read;
+  read = fread(*buffer, sizeof(**buffer), size, f);
   fclose(f);
 
   if (read != (size_t)size) {

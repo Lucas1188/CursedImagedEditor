@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include "../lib/base64encoder/b64tbl.h"
+#include "../cursedhelpers.h"
 int main(int argv, char** argc){
   int i,j;
   size_t fsize, bsize, wsize, remainder, blocks, pad;
@@ -13,7 +14,7 @@ int main(int argv, char** argc){
   _getb64size(fsize,&bsize,&remainder,&blocks);
   encodebuffer = (unsigned char*) malloc(bsize);
   
-  printf("Got string size %ld allocated %ld bytes for encoding with %ld blocks remainder: %ld\n",fsize,bsize,blocks,remainder);
+  LOG_I(("Got string size %ld allocated %ld bytes for encoding with %ld blocks remainder: %ld\n",fsize,bsize,blocks,remainder));
   
   for(i=0;i<fsize/3;i++){
   /*
@@ -37,7 +38,7 @@ int main(int argv, char** argc){
   */
     
   _getb64decodesize(encodebuffer, bsize, &wsize, &blocks, &pad);
-  printf("Got file size %ld allocated %ld bytes for decoding with %ld blocks pad: %ld\n",bsize,wsize,blocks,pad);
+  LOG_I(("Got file size %ld allocated %ld bytes for decoding with %ld blocks pad: %ld\n",bsize,wsize,blocks,pad));
   fbuffer = malloc(wsize);
   for(j=0;j<blocks;j++){
     remap4bytes(&encodebuffer[j*4], &fbuffer[j*3]);

@@ -4,16 +4,21 @@
 #include <stdio.h>
 extern void print_binary(int code,int len);
 extern void (*cursed_log_callback)(const char* msg);
+void _cursed_log_info(const char *fmt, ...);
+void _cursed_log_verbose(const char *fmt, ...);
+void _cursed_log_e_impl(const char *fmt, ...);
 
 #ifdef DEBUG
-  #define LOG_I(fmt, ...) do { printf(fmt, ##__VA_ARGS__); } while(0)
+  /* The macro 'args' will be the entire (fmt, ...) tuple */
+  #define LOG_I _cursed_log_info
 #else
-  #define LOG_I(fmt, ...)
+  #define LOG_I if(1); else _cursed_log_info
 #endif
+
 #if defined(VERBOSE)
-  #define LOG_V(fmt, ...) do { printf(fmt, ##__VA_ARGS__); } while(0)
+  #define LOG_V _cursed_log_verbose
 #else
-  #define LOG_V(fmt, ...)
+  #define LOG_V if(1); else _cursed_log_verbose
 #endif
 
 #ifdef VERBOSE
@@ -22,20 +27,13 @@ extern void (*cursed_log_callback)(const char* msg);
   #define PRINT_BINARY(value, bitcount)
 #endif
 
-#ifndef SILENT
-  extern void (*cursed_log_callback)(const char* msg);
+void cursed_snprintf_fallback(char *dest, size_t dest_sz, const char *fmt, ...);
+void cursed_strncpy(char *dest, const char *src, size_t n);
 
-  void cursed_snprintf_fallback(char *dest, size_t dest_sz, const char *fmt, ...);
+extern void (*cursed_log_callback)(const char* msg);
 
-#define LOG_E(...) do { \
-    char _log_buf[512]; \
-    cursed_snprintf_fallback(_log_buf, sizeof(_log_buf), __VA_ARGS__); \
-    if (cursed_log_callback) { \
-        cursed_log_callback(_log_buf); \
-    } else { \
-        fprintf(stderr, "%s", _log_buf); \
-    } \
-} while(0)
+#ifndef SILENT  
+  #define LOG_E _cursed_log_e_impl
 #endif
 
 #endif

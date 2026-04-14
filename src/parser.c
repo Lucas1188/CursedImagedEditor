@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include "../include/parser.h"
+#include "../lib/cursedhelpers.h"
 
 CommandAST parse_command(const char* input) {
     CommandAST ast;
@@ -10,13 +11,13 @@ CommandAST parse_command(const char* input) {
 
     /* Make a mutable copy of the input for strtok */
     char buffer[256];
-    strncpy(buffer, input, sizeof(buffer) - 1);
+    cursed_strncpy(buffer, input, sizeof(buffer) - 1);
     buffer[sizeof(buffer) - 1] = '\0';
 
     /* NEW: Intercept algebra expressions (anything with an '=' sign) */
     if (strchr(buffer, '=') != NULL) {
         ast.type = CMD_EVAL;
-        strncpy(ast.args[0], buffer, MAX_ARG_LEN - 1);
+        cursed_strncpy(ast.args[0], buffer, MAX_ARG_LEN - 1);
         ast.num_args = 1;
         return ast;
     }
@@ -29,11 +30,11 @@ CommandAST parse_command(const char* input) {
     }
 
     char cmd_str[MAX_ARG_LEN];
-    strncpy(cmd_str, token, sizeof(cmd_str) - 1);
+    cursed_strncpy(cmd_str, token, sizeof(cmd_str) - 1);
 
     /* Parse all subsequent arguments into the args array */
     while ((token = strtok(NULL, " \t\r\n")) != NULL && ast.num_args < MAX_ARGS) {
-        strncpy(ast.args[ast.num_args], token, MAX_ARG_LEN - 1);
+        cursed_strncpy(ast.args[ast.num_args], token, MAX_ARG_LEN - 1);
         ast.num_args++;
     }
 

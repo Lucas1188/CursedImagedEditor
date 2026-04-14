@@ -7,6 +7,8 @@
 #include "../lib/gzip/gzip.h"
 #include "../include/cursedtui.h"
 
+#ifdef BUILD_ENGINE
+
 static void print_usage(const char* prog) {
     fprintf(stderr,
         "Usage: %s [input.bmp] [output] [-png] [-gzip]\n"
@@ -53,7 +55,7 @@ static int gzip_file_to(const char* src, const char* dst) {
     free(bBuffer.data);
     return 1;
 }
-#ifdef BUILD_ENGINE
+
 int main(int argc, char* argv[]) {
     bitmap* bmp;
     png_s* png;
@@ -62,7 +64,7 @@ int main(int argc, char* argv[]) {
     int i, do_png, do_gzip;
     const char* input_file = NULL;
     const char* output_file = NULL;
-    const char* target_out_path;
+    const char* target_out_path = NULL;
 
     /* 1. THE DEFAULT: Interactive Mode */
     if (argc == 1) {

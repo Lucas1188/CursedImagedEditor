@@ -2,14 +2,14 @@
 #include "lzss.h"
 #include <stdint.h>
 
+uint32_t head[1<<(24-1)];   /* head of chain for each hash */
+uint32_t prev[1<<(24-1)]; /* previous positions in the same hash */
+
 void emit_pointer(slzss_pointer* sp, uint64_t pos, uint16_t match_len, uint16_t dist){
   sp->position = pos;
   sp->length = match_len;
   sp->distance = dist;
   LOG_V("LZPTR: %ld %ld %ld\n",sp->position,sp->length,sp->distance);
-  /*
-  printf("LZPTR: %ld %ld %ld\n",sp->position,sp->length,sp->distance);
-  */
 }
 
 unsigned int hash3(const uint8_t *buf) {
@@ -21,10 +21,10 @@ void insert_hash(const uint8_t* window, long int pos, long int input_size){
         return; 
     }
   unsigned int h = hash3(window + pos);
-    int wpos = pos & (WINDOW_SIZE - 1);
+  int wpos = pos & (WINDOW_SIZE - 1);
 
-    prev[wpos] = head[h];
-    head[h] = pos;
+  prev[wpos] = head[h];
+  head[h] = pos;
 }
 
 int find_match(const uint8_t* window, size_t input_size,
@@ -96,9 +96,7 @@ int generate_lzss_pointers(uint8_t* input,long int input_size,slzss_pointer* lzs
     match_len = find_match(input, input_size, pos, maxlen, &dist);
     if(match_len >= MIN_MATCH){
 
-        /*LOG_I("<%d,%d> \n",match_len,dist);*/
         emit_pointer(&lzss_ptrs[ptr_count++], pos, (uint16_t)match_len, (uint16_t)dist);
-        
 
         fn_olptr((uint16_t)match_len,(uint16_t)dist);
 

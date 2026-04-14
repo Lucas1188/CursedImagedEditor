@@ -100,7 +100,7 @@ int make_idat_chunks(const ihdr_chunk* header, const uint8_t* rawpx, const size_
     
     /* Adler calculation... */
     ad = write_b;
-    uint32_t ad32, s1 = 1, s2 = 0;
+    uint32_t ad32 = 0, s1 = 1, s2 = 0;
     size_t t = deflatedat;
     while(t > 0) { ad32 = adler32(*ad, &s1, &s2); ad++; t--; }
 
@@ -175,8 +175,9 @@ void encapsulate_idatchunks(png_s* p, png_chunk** chunks, size_t nchunks) {
     }
 }
 static void write_chunk(FILE* f, png_chunk* c) {
-    uint32_t len_be = bswap32(c->LENGTH);
-    uint32_t type_be = *(uint32_t*)c->CHUNK_TYPE;
+    uint32_t len_be,type_be,crc_be;
+    len_be = bswap32(c->LENGTH);
+    type_be = *(uint32_t*)c->CHUNK_TYPE;
 
     fwrite(&len_be, 4, 1, f);
     fwrite(&type_be, 4, 1, f);
@@ -184,7 +185,7 @@ static void write_chunk(FILE* f, png_chunk* c) {
     if (c->LENGTH > 0 && c->CHUNK_DATA) {
         fwrite(c->CHUNK_DATA, c->LENGTH, 1, f);
     }
-    uint32_t crc_be = bswap32(c->CRC);
+    crc_be = bswap32(c->CRC);
     fwrite(&crc_be, 4, 1, f);
 }
 

@@ -12,7 +12,6 @@ uint32_t get_file_crc_fptr_fsz(const char* filename,FILE** f_out,size_t* size_ou
     size_t total =0;
     uint32_t crc = 0xFFFFFFFF;
     while((read = fread(buf,1,sizeof(buf),*f_out))>0){
-        /*LOG_I("Reading file in chunks to calculate CRC32...%x\n",crc);*/
         crc = crc32(crc,buf,read);
         total+=read;
     }

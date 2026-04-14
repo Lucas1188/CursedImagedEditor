@@ -32,7 +32,7 @@ static void extract_base_name(const char* filepath, char* out_name, size_t max_l
     if (slash) base = slash + 1;
     if (backslash && backslash + 1 > base) base = backslash + 1;
     
-    strncpy(out_name, base, max_len);
+    cursed_strncpy(out_name, base, max_len);
     out_name[max_len - 1] = '\0';
     
     /* Strip the file extension */
@@ -49,7 +49,7 @@ static void print_directory_list() {
     if (d) {
         while ((dir = readdir(d)) != NULL && file_cache_count < MAX_FILES) {
             if (dir->d_name[0] == '.') continue;
-            strncpy(file_cache[file_cache_count], dir->d_name, 255);
+            cursed_strncpy(file_cache[file_cache_count], dir->d_name, 255);
             file_cache_count++;
         }
         closedir(d);
@@ -185,13 +185,13 @@ int execute_command(CommandAST ast) {
                 if (is_num) {
                     int idx = atoi(arg_str);
                     if (idx >= 0 && idx < file_cache_count) {
-                        strncpy(target_file, file_cache[idx], 255);
+                        cursed_strncpy(target_file, file_cache[idx], 255);
                     } else {
                         add_log("Error: Invalid file index. Run 'list' to refresh.");
                         return 1;
                     }
                 } else {
-                    strncpy(target_file, arg_str, 255);
+                    cursed_strncpy(target_file, arg_str, 255);
                 }
 
                 bitmap* temp_bmp = read_bitmap(target_file);
@@ -241,7 +241,7 @@ int execute_command(CommandAST ast) {
                         char clean_name[64];
                         extract_base_name(target_file, clean_name, sizeof(clean_name));
                         
-                        strncpy(layers[i].name, clean_name, 63); 
+                        cursed_strncpy(layers[i].name, clean_name, 63); 
                         layers[i].is_active = 1;
                         layers[i].op_count = 0;
                         layers[i].img_data = loaded_img; 
@@ -365,7 +365,7 @@ int execute_command(CommandAST ast) {
                     /* e.g., 'new shadow' */
                     if (canvas_width > 0 && canvas_height > 0) {
                         w = canvas_width; h = canvas_height;
-                        strncpy(custom_name, get_arg_str(&ast, 0, "Blank"), 63);
+                        cursed_strncpy(custom_name, get_arg_str(&ast, 0, "Blank"), 63);
                     } else {
                         add_log("Error: Canvas is empty. 'new' requires width and height (e.g., 'new 800 600').");
                         return 1;
@@ -378,7 +378,7 @@ int execute_command(CommandAST ast) {
                     /* e.g., 'new 800 600 shadow' */
                     w = get_arg_int(&ast, 0, 512);
                     h = get_arg_int(&ast, 1, 512);
-                    strncpy(custom_name, get_arg_str(&ast, 2, "Blank"), 63);
+                    cursed_strncpy(custom_name, get_arg_str(&ast, 2, "Blank"), 63);
                 }
 
                 /* Canvas locking enforcement */
@@ -422,7 +422,7 @@ int execute_command(CommandAST ast) {
 
                 memset(blank_img->pxs, 0, w * h * sizeof(tcursed_pix));
 
-                strncpy(layers[layer_slot].name, custom_name, 63);
+                cursed_strncpy(layers[layer_slot].name, custom_name, 63);
                 layers[layer_slot].is_active = 1;
                 layers[layer_slot].op_count = 0;
                 layers[layer_slot].img_data = blank_img;
@@ -533,18 +533,18 @@ int execute_command(CommandAST ast) {
                 } else if (ast.num_args == 1) {
                     const char* arg = get_arg_str(&ast, 0, "");
                     if (strcmp(arg, "png") == 0 || strcmp(arg, "bmp") == 0) {
-                        strncpy(format, arg, 15);
+                        cursed_strncpy(format, arg, 15);
                         cursed_snprintf_fallback(filename, sizeof(filename), "%s.%s", active_name, format);
                     } else {
-                        strncpy(filename, arg, 255);
+                        cursed_strncpy(filename, arg, 255);
                         const char* dot = strrchr(filename, '.');
                         if (dot && strcmp(dot, ".bmp") == 0) {
                             strcpy(format, "bmp");
                         }
                     }
                 } else {
-                    strncpy(format, get_arg_str(&ast, 0, "png"), 15);
-                    strncpy(filename, get_arg_str(&ast, 1, "output.png"), 255);
+                    cursed_strncpy(format, get_arg_str(&ast, 0, "png"), 15);
+                    cursed_strncpy(filename, get_arg_str(&ast, 1, "output.png"), 255);
                 }
 
                 /* 2. Route to correct format logic */
@@ -617,7 +617,7 @@ int execute_command(CommandAST ast) {
                 int p_idx = 0, j = 0;
                 int dest_id;
 
-                strncpy(eval_str, ast.args[0], 255); eval_str[255] = 0;
+                cursed_strncpy(eval_str, ast.args[0], 255); eval_str[255] = 0;
 
                 eq_ptr = strchr(eval_str, '=');
                 if (!eq_ptr) { add_log("Error: Missing '='."); return 1; }
@@ -668,7 +668,7 @@ int execute_command(CommandAST ast) {
                     layers[dest_id].img_data = dest_img;
                     
                     /* Give it the exact name they typed! */
-                    strncpy(layers[dest_id].name, dest_name, 63); 
+                    cursed_strncpy(layers[dest_id].name, dest_name, 63); 
                 }
                 layers[dest_id].op_count++;
 
@@ -777,7 +777,7 @@ int execute_command(CommandAST ast) {
                 user_file = get_arg_str(&ast, 0, "session");
                 
                 /* Safely copy to our buffer, leaving room for ".log" */
-                strncpy(safe_filename, user_file, 250);
+                cursed_strncpy(safe_filename, user_file, 250);
                 safe_filename[250] = '\0';
                 len = strlen(safe_filename);
                 

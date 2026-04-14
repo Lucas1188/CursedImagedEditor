@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "../include/tui_state.h"
-
+#include "../lib/cursedhelpers.h"
 /* Instantiate the globals */
 Layer layers[MAX_LAYERS] = {0};
 int selected_layer_idx = -1;
@@ -22,13 +22,13 @@ void clear_screen() {
 void add_log(const char* message) {
     int i;
     if (log_count < MAX_HISTORY) {
-        strncpy(window_log[log_count], message, 127);
+        cursed_strncpy(window_log[log_count], message, 127);
         log_count++;
     } else {
         for (i = 1; i < MAX_HISTORY; i++) {
             strcpy(window_log[i-1], window_log[i]);
         }
-        strncpy(window_log[MAX_HISTORY-1], message, 127);
+        cursed_strncpy(window_log[MAX_HISTORY-1], message, 127);
     }
 }
 
