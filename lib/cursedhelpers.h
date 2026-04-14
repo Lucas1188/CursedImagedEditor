@@ -25,9 +25,11 @@ extern void (*cursed_log_callback)(const char* msg);
 #ifndef SILENT
   extern void (*cursed_log_callback)(const char* msg);
 
+  void cursed_snprintf_fallback(char *dest, size_t dest_sz, const char *fmt, ...);
+
 #define LOG_E(...) do { \
-    char _log_buf[256]; \
-    snprintf(_log_buf, sizeof(_log_buf), __VA_ARGS__); \
+    char _log_buf[512]; \
+    cursed_snprintf_fallback(_log_buf, sizeof(_log_buf), __VA_ARGS__); \
     if (cursed_log_callback) { \
         cursed_log_callback(_log_buf); \
     } else { \

@@ -15,6 +15,7 @@
 #include "../lib/png/png.h"
 #include "../lib/cursedlib/math/kernels.h"
 #include "../lib/cursedlib/image/draw/draw.h"
+#include "../lib/cursedhelpers.h"
 
 #define MAX_FILES 50
 static char file_cache[MAX_FILES][256] = {0};
@@ -64,7 +65,7 @@ static void print_directory_list() {
     int i;
     for (i = 0; i < file_cache_count; i++) {
         char item[64];
-        snprintf(item, sizeof(item), "[%d] %-15s ", i, file_cache[i]);
+        cursed_snprintf_fallback(item, sizeof(item), "[%d] %-15s ", i, file_cache[i]);
         if (strlen(line_buf) + strlen(item) >= 110) {
             add_log(line_buf);
             memset(line_buf, 0, sizeof(line_buf));
@@ -195,7 +196,7 @@ int execute_command(CommandAST ast) {
 
                 bitmap* temp_bmp = read_bitmap(target_file);
                 if (!temp_bmp) {
-                    snprintf(msg_buffer, sizeof(msg_buffer), "Error: Failed to read bitmap '%s'.", target_file);
+                    cursed_snprintf_fallback(msg_buffer, sizeof(msg_buffer), "Error: Failed to read bitmap '%s'.", target_file);
                     add_log(msg_buffer);
                     return 1;
                 }
@@ -229,7 +230,7 @@ int execute_command(CommandAST ast) {
                     free(loaded_img);
                     loaded_img = resized_img;
                     
-                    snprintf(msg_buffer, sizeof(msg_buffer), "Notice: Image fitted to canvas (%dx%d)", canvas_width, canvas_height);
+                    cursed_snprintf_fallback(msg_buffer, sizeof(msg_buffer), "Notice: Image fitted to canvas (%dx%d)", canvas_width, canvas_height);
                     add_log(msg_buffer);
                 }
 
@@ -245,7 +246,7 @@ int execute_command(CommandAST ast) {
                         layers[i].op_count = 0;
                         layers[i].img_data = loaded_img; 
                         selected_layer_idx = i;
-                        snprintf(msg_buffer, sizeof(msg_buffer), "-> Loaded '%s' (Size: %lu%lu)", 
+                        cursed_snprintf_fallback(msg_buffer, sizeof(msg_buffer), "-> Loaded '%s' (Size: %lu%lu)", 
                                  layers[i].name, loaded_img->width, loaded_img->height);
                         add_log(msg_buffer);
                         return 1;
@@ -265,7 +266,7 @@ int execute_command(CommandAST ast) {
             for (i = 0; i < MAX_LAYERS; i++) {
                 if (layers[i].is_active && strcmp(layers[i].name, target_name) == 0) {
                     selected_layer_idx = i;
-                    snprintf(msg_buffer, sizeof(msg_buffer), "-> Selected layer '%s'", layers[i].name);
+                    cursed_snprintf_fallback(msg_buffer, sizeof(msg_buffer), "-> Selected layer '%s'", layers[i].name);
                     add_log(msg_buffer);
                     return 1;
                 }
@@ -278,7 +279,7 @@ int execute_command(CommandAST ast) {
                 if (selected_layer_idx == -1) { add_log("Error: No layer selected."); return 1; }
                 int ident = layers[selected_layer_idx].op_count++;
                 const char* op_name = (ast.type == CMD_BLUR) ? "BLUR" : "INVERT";
-                snprintf(msg_buffer, sizeof(msg_buffer), "[%s | Ident %d] Executed %s", 
+                cursed_snprintf_fallback(msg_buffer, sizeof(msg_buffer), "[%s | Ident %d] Executed %s", 
                          layers[selected_layer_idx].name, ident, op_name);
                 add_log(msg_buffer);
             }
@@ -344,10 +345,10 @@ int execute_command(CommandAST ast) {
                         if (selected_layer_idx == target_idx) {
                             selected_layer_idx = -1; 
                         }
-                        snprintf(msg_buffer, sizeof(msg_buffer), "-> Cleared layer '%s'. (Canvas size preserved)", target);
+                        cursed_snprintf_fallback(msg_buffer, sizeof(msg_buffer), "-> Cleared layer '%s'. (Canvas size preserved)", target);
                         add_log(msg_buffer);
                     } else {
-                        snprintf(msg_buffer, sizeof(msg_buffer), "Error: Layer '%s' not found.", target);
+                        cursed_snprintf_fallback(msg_buffer, sizeof(msg_buffer), "Error: Layer '%s' not found.", target);
                         add_log(msg_buffer);
                     }
                 }
@@ -383,7 +384,7 @@ int execute_command(CommandAST ast) {
                 /* Canvas locking enforcement */
                 if (canvas_width > 0 && canvas_height > 0) {
                     if (w != canvas_width || h != canvas_height) {
-                        snprintf(msg_buffer, sizeof(msg_buffer), "Notice: Enforcing canvas size (%dx%d).", canvas_width, canvas_height);
+                        cursed_snprintf_fallback(msg_buffer, sizeof(msg_buffer), "Notice: Enforcing canvas size (%dx%d).", canvas_width, canvas_height);
                         add_log(msg_buffer);
                     }
                     w = canvas_width;
@@ -427,7 +428,7 @@ int execute_command(CommandAST ast) {
                 layers[layer_slot].img_data = blank_img;
                 selected_layer_idx = layer_slot;
                 
-                snprintf(msg_buffer, sizeof(msg_buffer), "-> Created new layer '%s' (%dx%d)", 
+                cursed_snprintf_fallback(msg_buffer, sizeof(msg_buffer), "-> Created new layer '%s' (%dx%d)", 
                          layers[layer_slot].name, w, h);
                 add_log(msg_buffer);
             }
@@ -443,7 +444,7 @@ int execute_command(CommandAST ast) {
                 int b = CLAMP(get_arg_int(&ast, 2, 255), 0, 255);
                 int a = CLAMP(get_arg_int(&ast, 3, 255), 0, 255);
                 current_color = make_pixel(r * 257, g * 257, b * 257, a * 257);
-                snprintf(msg_buffer, sizeof(msg_buffer), "-> Set color to RGB(%d, %d, %d)", r, g, b);
+                cursed_snprintf_fallback(msg_buffer, sizeof(msg_buffer), "-> Set color to RGB(%d, %d, %d)", r, g, b);
                 add_log(msg_buffer);
             }
             break;
@@ -528,12 +529,12 @@ int execute_command(CommandAST ast) {
 
                 /* 1. Argument Parsing */
                 if (ast.num_args == 0) {
-                    snprintf(filename, sizeof(filename), "%s.png", active_name);
+                    cursed_snprintf_fallback(filename, sizeof(filename), "%s.png", active_name);
                 } else if (ast.num_args == 1) {
                     const char* arg = get_arg_str(&ast, 0, "");
                     if (strcmp(arg, "png") == 0 || strcmp(arg, "bmp") == 0) {
                         strncpy(format, arg, 15);
-                        snprintf(filename, sizeof(filename), "%s.%s", active_name, format);
+                        cursed_snprintf_fallback(filename, sizeof(filename), "%s.%s", active_name, format);
                     } else {
                         strncpy(filename, arg, 255);
                         const char* dot = strrchr(filename, '.');
@@ -554,7 +555,7 @@ int execute_command(CommandAST ast) {
                     if (!out_bmp) { add_log("Error: Conversion to BMP failed."); return 1; }
                                         
                     if (write_bitmap(out_bmp, filename)) {
-                        snprintf(msg_buffer, sizeof(msg_buffer), "-> Saved layer as 8-bit BMP to '%s'", filename);
+                        cursed_snprintf_fallback(msg_buffer, sizeof(msg_buffer), "-> Saved layer as 8-bit BMP to '%s'", filename);
                         add_log(msg_buffer);
                     } else {
                         add_log("Error: Failed to write BMP file.");
@@ -597,7 +598,7 @@ int execute_command(CommandAST ast) {
                     
                     if (png) {
                         if (write_png(filename, png) == 0) {
-                            snprintf(msg_buffer, sizeof(msg_buffer), "-> Saved 16-bit layer as PNG to '%s'", filename);
+                            cursed_snprintf_fallback(msg_buffer, sizeof(msg_buffer), "-> Saved 16-bit layer as PNG to '%s'", filename);
                             add_log(msg_buffer);
                         } else add_log("Error: Failed to write PNG file.");
                         free_png(png);
@@ -715,7 +716,7 @@ int execute_command(CommandAST ast) {
                     
                     cursed_apply_separable_blur(layers[selected_layer_idx].img_data, radius, sigma);
                     
-                    snprintf(msg_buffer, sizeof(msg_buffer), "-> Applied separable blur (Radius: %d)", radius);
+                    cursed_snprintf_fallback(msg_buffer, sizeof(msg_buffer), "-> Applied separable blur (Radius: %d)", radius);
                     add_log(msg_buffer);
                 } 
                 /* --- ROUTE 2: Hardcoded 3x3 and 5x5 Kernels --- */
@@ -736,7 +737,7 @@ int execute_command(CommandAST ast) {
 
                     if (k) {
                         cursed_apply_kernel(layers[selected_layer_idx].img_data, k);
-                        snprintf(msg_buffer, sizeof(msg_buffer), "-> Applied 2D kernel '%s'", filter_name);
+                        cursed_snprintf_fallback(msg_buffer, sizeof(msg_buffer), "-> Applied 2D kernel '%s'", filter_name);
                         add_log(msg_buffer);
                     } else {
                         add_log("Error: Unknown filter.");
@@ -796,7 +797,7 @@ int execute_command(CommandAST ast) {
                     
                     fclose(f);
                     
-                    snprintf(msg_buffer, sizeof(msg_buffer), "-> Exported command history to '%s'", safe_filename);
+                    cursed_snprintf_fallback(msg_buffer, sizeof(msg_buffer), "-> Exported command history to '%s'", safe_filename);
                     add_log(msg_buffer);
                 } else {
                     add_log("Error: Could not open file for logging.");
