@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "b64tbl.h"
-
+#include "../cursedhelpers.h"
 typedef enum RCODES{
   OK=1,
   ERROR=2,
@@ -101,7 +101,7 @@ int writefile_from_mem(const char* filename, const unsigned char* buffer,size_t 
   f = fopen(filename,"wb");
   n = fwrite(buffer,sizeof(char),size,f);
   fclose(f);
-  printf("Wrote %ld bytes to file: %s\n",n,filename);
+  LOG_I("Wrote %ld bytes to file: %s\n",n,filename);
   if(n!=size){ return ERROR|BAD_WRITE;}
   else{ return OK;}
 }

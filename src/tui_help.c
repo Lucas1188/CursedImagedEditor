@@ -1,6 +1,7 @@
 #include <string.h>
 #include "../include/tui_help.h"
 #include "../include/tui_state.h"
+#include "../lib/cursedhelpers.h"
 
 void display_help(const char* target_cmd) {
     if (target_cmd == NULL || strlen(target_cmd) == 0) {
@@ -78,7 +79,7 @@ void display_help(const char* target_cmd) {
     }
     else {
         char msg[128];
-        snprintf(msg, sizeof(msg), "Error: No help available for '%s'.", target_cmd);
+        cursed_snprintf_fallback(msg, sizeof(msg), "Error: No help available for '%s'.", target_cmd);
         add_log(msg);
     }
 }
