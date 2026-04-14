@@ -235,6 +235,7 @@ For detailed technical information:
 - **curl** (for fetching Pako.js)
 
 ### Using Docker (Recommended for Consistent Builds)
+##### Linux
 ```bash
 # Build the Docker image with Zig toolchain
 docker build -t cursed-builder .
@@ -243,9 +244,19 @@ docker build -t cursed-builder .
 docker run --rm -u $(id -u):$(id -g) -e ZIG_GLOBAL_CACHE_DIR=/tmp/zig-cache \
   -v $(pwd):/project cursed-builder make all
 ```
+##### Windows
 
-The `Dockerfile` sets up Zig 0.16.0-dev with all dependencies, ensuring identical builds across platforms. The `ZIG_GLOBAL_CACHE_DIR` environment variable redirects Zig's cache to a temporary directory, and `-u $(id -u):$(id -g)` ensures artifacts are created with your user's permissions (not root).
+```bash
+# Build the Docker image with Zig toolchain
+docker build -t cursed-builder .
 
+# Use internal PWD to resolve windows path
+# User id automatically mapped by WSL
+docker run --rm `
+  -e ZIG_GLOBAL_CACHE_DIR=/tmp/zig-cache `
+  -v ${PWD}:/project `
+  cursed-builder make all
+```
 ### Local Build Commands
 ```bash
 # Individual platform binaries (outputs to dist/)
