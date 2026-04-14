@@ -30,10 +30,8 @@ typedef void (*f_on_emit_lzss_ptr)(uint16_t length, uint16_t distance);
 typedef void (*f_count_distinct_literal)(uint16_t symbol);
 
 extern void emit_pointer(slzss_pointer* sp, uint64_t pos, uint16_t match_len, uint16_t dist);
-
-static uint32_t head[1<<(24-1)];   /* head of chain for each hash */
-static uint32_t prev[1<<(24-1)]; /* previous positions in the same hash */
-
+extern uint32_t head[1<<(24-1)];   /* head of chain for each hash */
+extern uint32_t prev[1<<(24-1)]; /* previous positions in the same hash */
 extern uint32_t hash3(const uint8_t *buf);
 extern void insert_hash(const uint8_t* window, long int pos, long int input_size);
 

@@ -69,7 +69,8 @@ void draw_line(size_t x0, size_t y0, size_t x1, size_t y1, tcursed_pix color, cu
             img->pxs[y0 * img->width + x0] = color;
         }
         if (x0 == x1 && y0 == y1) break;
-        int err2 = err * 2;
+        int err2;
+        err2 = err * 2;
         if (err2 > -dy) {
             err -= dy;
             x0 += sx;

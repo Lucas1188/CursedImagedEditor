@@ -13,14 +13,13 @@ const uint8_t CINFO_DEFLATE_WINDOW = 7;
 uint32_t get_file_ad32_fptr_fsz(const char* filename,FILE** f_out,size_t* size_out){
     size_t t,i;
     uint32_t ad32,s1,s2;
-    s1 = 1; s2=0; t=0;
+    s1 = 1; s2=0; t=0; ad32=0;
 
     LOG_I("Calculating AD32 for file: %s\n", filename);
     *f_out = fopen(filename,"rb");
     if(!*f_out){LOG_E("File ptr closed without warning! tried zlib: %s\n", filename);};
     uint8_t buf[4096];
     size_t read;
-    size_t total =0;
     
     while((read = fread(buf,1,sizeof(buf),*f_out))>0){
         for(i=0;i<read;i++){

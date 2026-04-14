@@ -1,8 +1,8 @@
 # Toolchain Selector: 'zig' (default) or 'gcc'
 MODE ?= zig
-
+OPT ?= -O3
 # Original Flags & Includes
-CFLAGS   = -ansi
+CFLAGS   = -ansi -Wall -Werror $(OPT)
 INCLUDES = -Ilib -Isrc
 DIST      = dist
 ALL_C     = $(shell find lib src -name "*.c")
@@ -12,7 +12,6 @@ BIN_NAMES = cursed-linux cursed.exe cursed-mac-x86 cursed-mac-arm
 
 # 2. Use the toggle ONLY to switch compilers
 ifeq ($(MODE), zig)
-	CFLAGS   += -O3
 	CC_LINUX  = zig cc -target x86_64-linux-gnu
     CC_WIN    = zig cc -target x86_64-windows-gnu
     CC_PACKER = zig cc
@@ -34,7 +33,18 @@ FINAL_PDF = $(DIST)/Submission_Manifest_GroupX.pdf
 
 .PHONY: all bundle deliver pdf clean prepare
 
-all: clean deliver pdf
+all: clean deliver pdf measure-artifacts
+
+measure-artifacts: $(BINS)
+	@echo ">>> Measuring Resident Artifacts..."
+	@for bin in $(BINS); do \
+		if [ -f $$bin ]; then \
+			size=$$(stat -c%s "$$bin"); \
+			echo "  [$$bin]: $${size} bytes"; \
+		else \
+			echo "  [$$bin]: [MISSING]"; \
+		fi; \
+	done
 
 prepare:
 	@mkdir -p $(DIST)
@@ -73,13 +83,15 @@ bundle: $(PACKER) $(BINS)
 	@echo ">>> Stitching master template..."
 	@sed -e '/__PAKO_MIN_JS__/{r $(DIST)/pako.min.js' -e 'd}' $(TPL) > $(UNPACKER)
 	@echo ">>> Generating Master Data URL..."
-	@(cd $(DIST) && ../$(PACKER) dist.html $(BIN_NAMES) > url.txt)
-	@echo ">>> OK!"
+#	cd into dist to so relative paths to binaries work correctly in the packer command
+	@(cd $(DIST) && ./packer dist.html $(BIN_NAMES) > url.txt)
 
 deliver: bundle
+	@echo ">>> Generating HTML Delivery..."
 	@./$(PACKER) -delivery $(TDL) $(URL_FILE) > $(FINAL_OUT)
 
 pdf: bundle
+	@echo ">>> Generating PDF Delivery..."
 	@./$(PACKER) -pdf $(FINAL_PDF) $(URL_FILE)
 
 clean:

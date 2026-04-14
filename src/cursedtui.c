@@ -23,7 +23,7 @@ char *getcwd(char *buf, size_t size);
 #define MAX_CMD_LEN 376
 
 /* Creates a fast, low-res copy of an image for the real-time monitor */
-static cursed_img* cursed_create_proxy(cursed_img* src, int scale) {
+cursed_img* cursed_create_proxy(cursed_img* src, int scale) {
     cursed_img* proxy;
     size_t pw, ph, px, py;
     
@@ -57,7 +57,7 @@ static cursed_img* cursed_create_proxy(cursed_img* src, int scale) {
 }
 
 void log_clickable_link(const char* full_path, const char* label) {
-    char link_buffer[2048];
+    char link_buffer[2048+512];
     
     /* \033]8;;      -> Start Hyperlink
        %s            -> The URL
