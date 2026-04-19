@@ -277,7 +277,6 @@ The math evaluator supports full arithmetic over multiple layers simultaneously.
 | `emboss` | 3×3 Emboss | Directional depth effect |
 | `sobel_x` | 3×3 Sobel | Vertical gradient |
 | `sobel_y` | 3×3 Sobel | Horizontal gradient |
-| `greyscale` | Luma conversion | ITU-R BT.601 monochrome |
 | `identity` | 3×3 Passthrough | No-op (testing) |
 
 ### Math Evaluator
