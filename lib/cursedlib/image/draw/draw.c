@@ -152,18 +152,37 @@ void fill_triangle(size_t x0, size_t y0, size_t x1, size_t y1, size_t x2, size_t
 
     int total_height = (int)(y2 - y0);
     int j, i;
+    
+    /* Guard against perfectly flat triangles (division by zero) */
+    if (total_height == 0) return;
+
     for (i = 0; i < total_height; i++) {
-        int second_half = i > (int)(y1 - y0) || (int)(y1 == y0);
+        int second_half = i > (int)(y1 - y0) || (y1 == y0);
         int segment_height = second_half ? (int)(y2 - y1) : (int)(y1 - y0);
         float alpha = (float)i / total_height;
-        float beta  = (float)(i - (second_half ? (int)(y1 - y0) : 0)) / segment_height;
+        float beta  = 0.0f;
+        
+        int ax, bx;
 
-        int ax = (int)x0 + (int)(((int)x2 - (int)x0) * alpha);
-        int bx = second_half ? (int)x1 + (int)((x2 - x1) * beta) : (int)x0 + (int)((x1 - x0) * beta);
+        /* Guard against flat-topped or flat-bottomed segments (division by zero) */
+        if (segment_height > 0) {
+            beta = (float)(i - (second_half ? (int)(y1 - y0) : 0)) / segment_height;
+        }
+
+        /* STRICTLY CAST ALL OPERANDS TO SIGNED INT BEFORE SUBTRACTION */
+        ax = (int)x0 + (int)(((int)x2 - (int)x0) * alpha);
+        
+        if (second_half) {
+            bx = (int)x1 + (int)(((int)x2 - (int)x1) * beta);
+        } else {
+            bx = (int)x0 + (int)(((int)x1 - (int)x0) * beta);
+        }
 
         if (ax > bx) { int tmp = ax; ax = bx; bx = tmp; }
+        
         for (j = ax; j <= bx; j++) {
-            if ((size_t)j < img->width && (size_t)(y0 + i) < img->height) {
+            /* Guard j against negative bounds to prevent underflow cast to size_t */
+            if (j >= 0 && (size_t)j < img->width && (size_t)(y0 + i) < img->height) {
                 img->pxs[(y0 + i) * img->width + j] = color;
             }
         }
