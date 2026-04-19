@@ -158,7 +158,7 @@ void fill_triangle(size_t x0, size_t y0, size_t x1, size_t y1, size_t x2, size_t
         float alpha = (float)i / total_height;
         float beta  = (float)(i - (second_half ? (int)(y1 - y0) : 0)) / segment_height;
 
-        int ax = (int)x0 + (int)((x2 - x0) * alpha);
+        int ax = (int)x0 + (int)(((int)x2 - (int)x0) * alpha);
         int bx = second_half ? (int)x1 + (int)((x2 - x1) * beta) : (int)x0 + (int)((x1 - x0) * beta);
 
         if (ax > bx) { int tmp = ax; ax = bx; bx = tmp; }
