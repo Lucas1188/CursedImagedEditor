@@ -2,8 +2,8 @@
 #include "lzss.h"
 #include <stdint.h>
 
-uint32_t head[1<<(24-1)];   /* head of chain for each hash */
-uint32_t prev[1<<(24-1)]; /* previous positions in the same hash */
+uint32_t head[1<<24];   /* head of chain for each hash */
+uint32_t prev[1<<24]; /* previous positions in the same hash */
 
 void emit_pointer(slzss_pointer* sp, uint64_t pos, uint16_t match_len, uint16_t dist){
   sp->position = pos;

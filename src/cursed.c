@@ -28,14 +28,8 @@ static int has_flag(int argc, char* argv[], const char* flag) {
 }
 
 static int gzip_file_to(const char* src, const char* dst) {
-    bitarray bBuffer;
+    bitarray bBuffer = {0};
     FILE* wf;
-
-    bBuffer.data     = NULL;
-    bBuffer.size     = 0;
-    bBuffer.used     = 0;
-    bBuffer.bitbuf   = 0;
-    bBuffer.bitcount = 0;
 
     if (write_gzip_from_file(src, &bBuffer) <= 0) {
         LOG_E("Failed to compress: %s\n", src);
@@ -88,12 +82,11 @@ int main(int argc, char* argv[]) {
     do_gzip = has_flag(argc, argv, "-gzip");
 
       /* 5. POST-PROCESS (COMPRESSION) STAGE */
-    if (do_gzip) {
-        if (!gzip_file_to(target_out_path, output_file)) {
-            remove(target_out_path); /* Clean up temp file on fail */
+    if (do_gzip && !do_png) {
+        if (!gzip_file_to(input_file, output_file)) {
             return 1;
         }
-        remove(target_out_path); /* Clean up temp file on success */
+        return 0;
     }
     /* 3. INPUT STAGE */
     bmp = read_bitmap(input_file);

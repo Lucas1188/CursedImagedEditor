@@ -2,7 +2,7 @@
 MODE ?= zig
 OPT ?= -O3
 # Original Flags & Includes
-CFLAGS   = -ansi -Wall -Werror $(OPT)
+CFLAGS   = -ansi -Wall -Werror -fno-builtin -fno-strict-aliasing $(OPT)
 INCLUDES = -Ilib -Isrc
 DIST      = dist
 ALL_C     = $(shell find lib src -name "*.c")
@@ -84,6 +84,7 @@ bundle: $(PACKER) $(BINS)
 	@sed -e '/__PAKO_MIN_JS__/{r $(DIST)/pako.min.js' -e 'd}' $(TPL) > $(UNPACKER)
 	@echo ">>> Generating Master Data URL..."
 #	cd into dist to so relative paths to binaries work correctly in the packer command
+	@echo "(cd $(DIST) && ./packer dist.html $(BIN_NAMES) > url.txt)"
 	@(cd $(DIST) && ./packer dist.html $(BIN_NAMES) > url.txt)
 
 deliver: bundle
