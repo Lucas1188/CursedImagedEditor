@@ -1,13 +1,6 @@
-# Cursed Image Editor: Advanced Compositing Recipes — v2.0
+# Cursed Image Editor: Advanced Compositing Recipes
 
-Welcome to the **CursedImageEditor** compositing guide, version 2.0.
-
-This revision reflects the current command set as documented in `DOCS.md`. Key changes from v1.0:
-
-- **`select` now targets layers by name**, not by numeric index. Always name your layers with `new` and use those names in `select`.
-- **New filter names** aligned with kernel constants: `sobel_x`, `sobel_y`, `gaussian3`, `gaussian5`, `unsharp5`, `box_blur`.
-- **New recipes** added for greyscale noir, triangle spotlight masking, and multi-layer blending.
-- **Quick Reference** table added at the end.
+Welcome to the **CursedImageEditor** compositing guide
 
 Because this engine features a multi-layer architecture, a full AST math evaluator, channel masking, and 4K-capable separable convolutions, it operates less like a standard paint program and more like a command-line node-graph compositor.
 
@@ -20,16 +13,16 @@ By isolating the color channels and applying a heavy separable blur *only* to th
 **The Workflow:**
 ```text
 > load photo.bmp
-> new 800 600 blur_layer
-> blur_layer = l0
-> select blur_layer
+> new 800 600 l0
+> l0 = photo
+> select l0
 > filter blur 15
-> l0 = blur_layer[r] + l0[g,b,a]
+> l0 = photo[r] + l0[g,b,a]
 > select l0
 > save out_retro.png
 ```
 
-**How it works:** We duplicate the original image into a named layer `blur_layer`, apply a 15-pixel separable Gaussian blur to it, then use the math evaluator's channel masking (`blur_layer[r]`) to composite the blurry red data back over the crisp green, blue, and alpha channels of the original (`l0`). The `select` commands now target layers by their name rather than index.
+**How it works:** We duplicate the original image into a named layer `l0`, apply a 15-pixel separable Gaussian blur to it, then use the math evaluator's channel masking (`blur_layer[r]`) to composite the blurry red data back over the crisp green, blue, and alpha channels of the original. The `select` commands now target layers by their name rather than index.
 
 ---
 
@@ -41,24 +34,15 @@ Multiplying an edge map over an image creates a dark, gritty "grunge" effect. Fo
 ```text
 > load photo.bmp
 > new 800 600 edges
-> edges = l0
+> edges = photo
 > select edges
 > filter edge2
-> l0 = l0 + (edges * 0.3)
-> select l0
+> result = photo + (edges * 0.3)
+> select result
 > save out_sharp.png
 ```
 
 **How it works:** The `edge2` (8-connected Laplacian) kernel extracts high-frequency details. We scale that detail map down to 30% (`edges * 0.3`) to prevent blown-out pixels, then linearly add it back to the original colors.
-
-**Upgrade — Unsharp Masking in One Step:** If you prefer a single-pass approach, the built-in `unsharp5` kernel applies a 5×5 unsharp mask directly:
-
-```text
-> load photo.bmp
-> filter unsharp5
-> save out_sharp2.png
-```
-
 ---
 
 ## 3. The "Neon Edge" Colorizer
@@ -103,14 +87,6 @@ Bloom simulates intense light bleeding over the edges of bright objects, mimicki
 ```
 
 **How it works:** A 40-pixel separable blur diffuses the light across the canvas. Adding 45% of that blurred light back to the original mathematically simulates a "Screen" or "Linear Dodge" blend mode, raising the black levels and making highlights glow softly.
-
-**Quality Upgrade:** For a softer, more physically accurate bloom, use `filter gaussian5` instead of the separable blur. The 5×5 Gaussian kernel produces a more controlled falloff at the cost of a fixed kernel size:
-
-```text
-> select bloom
-> filter gaussian5
-```
-
 ---
 
 ## 5. Geometric Emboss Masking
@@ -119,7 +95,7 @@ You can combine the built-in rasterization tools with the math evaluator to crea
 
 **The Workflow:**
 ```text
-> load texture.bmp
+> load l0.bmp
 > new 800 600 emboss
 > new 800 600 mask
 > emboss = l0
@@ -144,13 +120,13 @@ You can combine the built-in rasterization tools with the math evaluator to crea
 
 ---
 
-## 6. *(New)* B&W Noir with Soft Glow
+## 6. B&W Noir with Soft Glow
 
 Combine the `greyscale` filter with a ghost-glow bloom to produce a classic noir aesthetic — sharp monochrome detail with a dreamy luminous haze over the highlights.
 
 **The Workflow:**
 ```text
-> load portrait.bmp
+> load l0.bmp
 > filter greyscale
 
 > new 800 600 glow
@@ -167,13 +143,13 @@ Combine the `greyscale` filter with a ghost-glow bloom to produce a classic noir
 
 ---
 
-## 7. *(New)* Triangle Spotlight Mask
+## 7.Triangle Spotlight Mask
 
 The `filltriangle` primitive lets you define arbitrary directional spotlights. By blurring the triangle's edges and using it as a Lerp mask, you can focus the viewer's attention on a wedge-shaped area of any image.
 
 **The Workflow:**
 ```text
-> load scene.bmp
+> load l0.bmp
 > new 800 600 darkened
 > new 800 600 spotlight
 
@@ -197,13 +173,13 @@ The `filltriangle` primitive lets you define arbitrary directional spotlights. B
 
 ---
 
-## 8. *(New)* Multi-Layer Blend & Difference Map
+## 8. Multi-Layer Blend & Difference Map
 
 The math evaluator supports full arithmetic over multiple layers simultaneously. This recipe demonstrates a 70/30 dissolve blend and a difference-map inspection workflow — useful for comparing processing stages.
 
 **The Workflow (Dissolve Blend):**
 ```text
-> load base.bmp
+> load l0.bmp
 > new 800 600 overlay
 > overlay = l0
 > select overlay
@@ -216,7 +192,7 @@ The math evaluator supports full arithmetic over multiple layers simultaneously.
 
 **The Workflow (Difference Map):**
 ```text
-> load before.bmp
+> load l0.bmp
 > new 800 600 after
 > after = l0
 > select after
@@ -240,7 +216,7 @@ The math evaluator supports full arithmetic over multiple layers simultaneously.
 |---------|--------|-------|
 | `load` | `load <filename>` | Loads BMP; auto-fits to canvas size |
 | `new` | `new <w> <h> <name>` | Creates a blank named layer |
-| `select` | `select <name>` | Activates a layer by **name** |
+| `select` | `select <name>` | Activates a layer by name |
 | `color` | `color <r> <g> <b> [a]` | Sets draw color (0–255 per channel) |
 | `draw` | `draw <shape> <args>` | See shapes table below |
 | `filter` | `filter <name> [radius]` | See filters table below |
@@ -277,7 +253,6 @@ The math evaluator supports full arithmetic over multiple layers simultaneously.
 | `emboss` | 3×3 Emboss | Directional depth effect |
 | `sobel_x` | 3×3 Sobel | Vertical gradient |
 | `sobel_y` | 3×3 Sobel | Horizontal gradient |
-| `greyscale` | Luma conversion | ITU-R BT.601 monochrome |
 | `identity` | 3×3 Passthrough | No-op (testing) |
 
 ### Math Evaluator
@@ -289,7 +264,6 @@ Expressions are entered as assignment statements: `<dest> = <expr>`
 > result = l0 * 0.7 + l1 * 0.3  # 70/30 dissolve
 > result = l0 - l1               # Difference map
 > result = l0[r] * 0.0 + l0[g,b,a]  # Zero out red channel
-> result = (l1 * l2[r]) + (l0 * (1.0 - l2[r]))  # Lerp mask
 ```
 
 Channel selectors (`[r]`, `[g]`, `[b]`, `[a]`, `[r,g,b]`, `[g,b,a]`, etc.) isolate specific channels for read, while the destination always receives a full RGBA result.
